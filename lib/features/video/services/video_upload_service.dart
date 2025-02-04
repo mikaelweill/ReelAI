@@ -11,6 +11,9 @@ class VideoUploadService {
 
   Future<String> uploadVideo({
     required String filePath,
+    required String title,
+    String? description,
+    required bool isPrivate,
     void Function(double)? onProgress,
   }) async {
     final user = _auth.currentUser;
@@ -49,14 +52,16 @@ class VideoUploadService {
         'userId': user.uid,
         'videoUrl': videoUrl,
         'thumbnailUrl': '', // TODO: Generate and upload thumbnail
-        'title': 'Video $videoId', // TODO: Allow user to set title
-        'description': '',
+        'title': title,
+        'description': description ?? '',
+        'isPrivate': isPrivate,
         'likes': 0,
         'comments': 0,
         'createdAt': FieldValue.serverTimestamp(),
         'duration': duration,
         'size': snapshot.totalBytes,
         'aspectRatio': aspectRatio,
+        'status': 'ready',
       });
 
       return videoId;

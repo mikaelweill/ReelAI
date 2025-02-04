@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import '../../video/services/video_upload_service.dart';
+import '../widgets/video_metadata_dialog.dart';
 
 class VideoPreviewScreen extends StatefulWidget {
   final String videoPath;
@@ -47,6 +48,16 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
   }
 
   Future<void> _handlePublish() async {
+    // Show metadata dialog first
+    final metadata = await showDialog<VideoMetadata>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const VideoMetadataDialog(),
+    );
+
+    // If user cancelled, return
+    if (metadata == null) return;
+
     setState(() {
       _isUploading = true;
       _uploadComplete = false;
@@ -58,6 +69,9 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
       bool uploadFinished = false;
       String? videoId = await _uploadService.uploadVideo(
         filePath: widget.videoPath,
+        title: metadata.title,
+        description: metadata.description,
+        isPrivate: metadata.isPrivate,
         onProgress: (progress) {
           setState(() {
             _uploadProgress = progress;
@@ -80,7 +94,7 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
           SnackBar(
             content: Text('Upload failed: $e'),
             backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
+            duration: const Duration(seconds: 3),
           ),
         );
         setState(() {

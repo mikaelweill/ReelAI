@@ -72,12 +72,15 @@
    - Private: Only visible to creator
    - Public: Visible in main feed
 
-2. Video Upload Enhancement
-   - Add title prompt when saving/publishing
-   - Required title field for all videos
-   - Option to add description (optional)
-   - Show upload progress
-   - Preview thumbnail in upload dialog
+2. Video Upload Enhancement (Current Focus)
+   - Add title input dialog (required)
+     - Minimum length: 3 characters
+     - Maximum length: 50 characters
+     - Show error if empty or invalid
+   - Add optional description field
+     - Maximum length: 200 characters
+     - Placeholder text for guidance
+   - Show character count for both fields
 
 3. My Videos Section UI Improvements
    - Clean card-based layout with proper spacing
@@ -95,8 +98,8 @@ videos/{videoId}
 {
   userId: string,
   videoUrl: string,
-  title: string,        // New required field
-  description: string,  // New optional field
+  title: string,        // Required, 3-50 chars
+  description: string?, // Optional, max 200 chars
   createdAt: timestamp,
   duration: number,
   size: number,
@@ -142,49 +145,31 @@ videos/{videoId}
    - videos by userId (for profile)
    - videos by likes (for trending)
 
-### Implementation Plan (Minimal Changes Required)
-1. Upload Flow Updates
-   - Add title input dialog before upload
-   - Validate title (required, min/max length)
-   - Store title in Firestore
+### Implementation Steps
+1. Update Upload Dialog
+   - Create new dialog component for title/description
+   - Add input validation logic
+   - Handle keyboard and form submission
 
-2. UI Enhancements
-   - Redesign video cards with Material Design
-   - Add proper spacing and margins
-   - Implement consistent typography
-   - Show video titles prominently
+2. Update Video Service
+   - Modify upload method to require title
+   - Add validation checks
+   - Handle optional description
 
-3. Database Updates
-   - Add `isPrivate` field to existing video schema
-   - No migration needed, default to public for existing videos
+3. Error Handling
+   - Show clear error messages for:
+     - Missing title
+     - Invalid title length
+     - Upload failures
+   - Allow retry without re-uploading video
 
-4. UI Changes
-   - Add bottom navigation bar with Home and My Videos tabs
-   - Reuse existing video player component
-   - Simple toggle for private/public status
-
-5. Service Layer Updates
-   - Modify video feed query to filter private videos
-   - Add query for user's videos (both private and public)
-   - Add privacy toggle functionality
-
-6. Upload Flow
-   - Add simple dialog with Save/Publish options
-   - Update upload completion handler
+4. Testing Scenarios
+   - Upload with title only
+   - Upload with title and description
+   - Upload with invalid inputs
+   - Network failure handling
+   - Cancellation handling
 
 ### Queries to Support
 1. Main Feed:
-   ```typescript
-   videos
-     .where('isPrivate', '==', false)
-     .where('status', '==', 'ready')
-     .orderBy('createdAt', 'desc')
-   ```
-
-2. My Videos:
-   ```typescript
-   videos
-     .where('userId', '==', currentUserId)
-     .where('status', '==', 'ready')
-     .orderBy('createdAt', 'desc')
    ```

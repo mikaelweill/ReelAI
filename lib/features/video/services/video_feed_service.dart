@@ -5,40 +5,52 @@ class Video {
   final String id;
   final String userId;
   final String videoUrl;
-  final DateTime createdAt;
-  final int duration;
-  final double aspectRatio;
-  final String status;
-  final String? title;
+  final String? thumbnailUrl;
+  final String title;
   final String? description;
   final bool isPrivate;
+  final int likes;
+  final int comments;
+  final DateTime createdAt;
+  final int duration;
+  final int size;
+  final double aspectRatio;
+  final String status;
 
   Video({
     required this.id,
     required this.userId,
     required this.videoUrl,
+    this.thumbnailUrl,
+    required this.title,
+    this.description,
+    required this.isPrivate,
+    required this.likes,
+    required this.comments,
     required this.createdAt,
     required this.duration,
+    required this.size,
     required this.aspectRatio,
     required this.status,
-    this.title,
-    this.description,
-    this.isPrivate = false,
   });
 
   factory Video.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return Video(
       id: doc.id,
-      userId: data['userId'] ?? '',
-      videoUrl: data['videoUrl'] ?? '',
+      userId: data['userId'] as String,
+      videoUrl: data['videoUrl'] as String,
+      thumbnailUrl: data['thumbnailUrl'] as String?,
+      title: data['title'] as String,
+      description: data['description'] as String?,
+      isPrivate: data['isPrivate'] as bool? ?? false,
+      likes: data['likes'] as int? ?? 0,
+      comments: data['comments'] as int? ?? 0,
       createdAt: (data['createdAt'] as Timestamp).toDate(),
-      duration: data['duration'] ?? 0,
-      aspectRatio: (data['aspectRatio'] ?? 1.0).toDouble(),
-      status: data['status'] ?? 'ready',
-      title: data['title'],
-      description: data['description'],
-      isPrivate: data['isPrivate'] ?? false,
+      duration: data['duration'] as int? ?? 0,
+      size: data['size'] as int? ?? 0,
+      aspectRatio: (data['aspectRatio'] as num?)?.toDouble() ?? 16/9,
+      status: data['status'] as String? ?? 'ready',
     );
   }
 }
@@ -49,35 +61,27 @@ class VideoFeedService {
 
   // Get all videos for the current user
   Stream<List<Video>> getUserVideos() {
-    final userId = _auth.currentUser?.uid;
-    if (userId == null) return Stream.value([]);
+    final user = _auth.currentUser;
+    if (user == null) return Stream.value([]);
 
     return _firestore
         .collection('videos')
-        .where('userId', isEqualTo: userId)
+        .where('userId', isEqualTo: user.uid)
         .orderBy('createdAt', descending: true)
         .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => Video.fromFirestore(doc))
-              .where((video) => video.status == 'ready')
-              .toList();
-        });
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Video.fromFirestore(doc)).toList());
   }
 
   // Get all videos for the feed
   Stream<List<Video>> getAllVideos() {
     return _firestore
         .collection('videos')
+        .where('isPrivate', isEqualTo: false)  // Only show public videos
         .orderBy('createdAt', descending: true)
-        .limit(10)
         .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => Video.fromFirestore(doc))
-              .where((video) => video.status == 'ready')
-              .toList();
-        });
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Video.fromFirestore(doc)).toList());
   }
 
   // Delete a video
