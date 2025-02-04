@@ -9,7 +9,7 @@ plugins {
 }
 
 android {
-    namespace = "com.reelai.reelai"
+    namespace "com.reelai.reelai"
     compileSdkVersion 34
     ndkVersion = flutter.ndkVersion
 
