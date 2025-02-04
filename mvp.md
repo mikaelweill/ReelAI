@@ -28,14 +28,6 @@
 3. Handle auth state management ✓
 4. Basic navigation flow ✓
 
-### User Profile (Next)
-1. Create user profile in Firestore after signup
-2. Store basic user information:
-   - Display name
-   - Profile picture (optional)
-   - Bio (optional)
-3. Profile edit screen
-
 ## Phase 3: Core Features (In Progress)
 
 ### Camera Implementation ✓
@@ -45,66 +37,137 @@
 - Camera flip functionality ✓
 - Preview screen with playback ✓
 
-### Video Storage & Management (Next)
-1. Create Firebase Storage structure
-   - `/videos/{userId}/{videoId}.mp4`
-   - `/thumbnails/{userId}/{videoId}.jpg`
-2. Implement video upload service
-   - Upload video to Firebase Storage
-   - Generate and upload thumbnail
-   - Create video metadata in Firestore
-3. Add upload progress indicator
-4. Handle upload errors and retries
+### Video Creation Enhancements (Next)
+1. Recording Controls
+   - Maximum duration limit (60 seconds)
+   - Minimum duration limit (3 seconds)
+   - Recording timer display
+   - Tap-to-focus
+2. Video Quality
+   - Adjust resolution settings
+   - Optimize file size
+3. Basic Effects
+   - Flash mode toggle
+   - Speed controls (0.5x, 1x, 2x)
+   - Basic filters
 
-### Feed Implementation (Upcoming)
-- Vertical scrolling video feed
-- Video player with autoplay
-- Basic engagement buttons (like, comment)
+### Video Playback Implementation (Priority)
+1. Create Basic Feed Screen
+   - Simple vertical scrolling list
+   - Full-screen video player
+   - Smooth loading transitions
+2. Video Player Features
+   - Auto-play when in view
+   - Mute/unmute toggle
+   - Loop playback
+   - Loading indicators
+3. Video List Management
+   - Fetch from Firestore by date
+   - Basic caching for smooth playback
+   - Load more on scroll
+
+### Video Management Implementation (Current Priority)
+1. Video Privacy Controls
+   - Add `isPrivate` boolean field to videos
+   - Private: Only visible to creator
+   - Public: Visible in main feed
+
+2. My Videos Section
+   - New tab in bottom navigation
+   - Display grid/list of user's videos
+   - Show both private and public videos
+   - Sort by creation date (newest first)
+   - Visual indicator for private/public status
+
+3. Upload Flow Enhancement
+   - Add "Save as Private" vs "Publish" options
+   - Show upload progress
+   - Allow editing privacy settings after upload
 
 ### Database Structure
-#### Users Collection
-```typescript
-users/{userId}
-{
-  displayName: string,
-  email: string,
-  profilePicture?: string,
-  bio?: string,
-  createdAt: timestamp,
-  updatedAt: timestamp
-}
-```
-
 #### Videos Collection
 ```typescript
 videos/{videoId}
 {
   userId: string,
-  title: string,
-  description?: string,
   videoUrl: string,
-  thumbnailUrl: string,
-  likes: number,
-  comments: number,
   createdAt: timestamp,
   duration: number,
   size: number,
-  aspectRatio: number
+  aspectRatio: number,
+  status: 'processing' | 'ready' | 'failed',
+  isPrivate: boolean,
+  lastModified: timestamp,
 }
 ```
 
 ## Next Steps Priority:
-1. ✓ Implement basic camera functionality
-2. ✓ Add video preview and playback
-3. → Implement video upload to Firebase Storage (Current Task)
-4. Create video feed screen
-5. Add video playback in feed
+1. ✓ Basic camera functionality
+2. ✓ Video preview and upload
+3. → Enhance video recording features
+   - Add recording timer
+   - Add speed controls
+   - Add flash toggle
+4. → Implement basic video feed
+   - Create scrolling video list
+   - Add auto-playing video player
+   - Handle video loading states
 
-## Future Enhancements:
+## Future Enhancements (Post-MVP):
+- Captions and descriptions
+- Likes and views tracking
+- User profiles
 - Comments system
-- Like functionality
-- User following
 - Video sharing
-- Push notifications
-- Video filters and effects
+- Advanced filters and effects
 - Background music
+- Following system
+
+## NoSQL Data Modeling Notes:
+1. Denormalized Structure
+   - Store frequently accessed data together
+   - Minimize number of reads needed
+2. Queries to Support:
+   - Get latest videos for feed
+   - Get user's videos
+   - Get liked videos
+3. Indexes Needed:
+   - videos by createdAt (for feed)
+   - videos by userId (for profile)
+   - videos by likes (for trending)
+
+### Implementation Plan (Minimal Changes Required)
+1. Database Updates
+   - Add `isPrivate` field to existing video schema
+   - No migration needed, default to public for existing videos
+
+2. UI Changes
+   - Add bottom navigation bar with Home and My Videos tabs
+   - Reuse existing video player component
+   - Simple toggle for private/public status
+
+3. Service Layer Updates
+   - Modify video feed query to filter private videos
+   - Add query for user's videos (both private and public)
+   - Add privacy toggle functionality
+
+4. Upload Flow
+   - Add simple dialog with Save/Publish options
+   - Update upload completion handler
+
+### Queries to Support
+1. Main Feed:
+   ```typescript
+   videos
+     .where('isPrivate', '==', false)
+     .where('status', '==', 'ready')
+     .orderBy('createdAt', 'desc')
+   ```
+
+2. My Videos:
+   ```typescript
+   videos
+     .where('userId', '==', currentUserId)
+     .where('status', '==', 'ready')
+     .orderBy('createdAt', 'desc')
+   ```
