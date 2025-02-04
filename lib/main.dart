@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:reelai/features/auth/screens/login_screen.dart';
-import 'package:reelai/features/home/screens/home_screen.dart';
+import 'package:reelai/features/navigation/screens/main_navigation.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,8 +51,8 @@ class MyApp extends StatelessWidget {
           }
           
           if (snapshot.hasData && snapshot.data != null) {
-            print('User is signed in, showing HomeScreen');
-            return const HomeScreen();
+            print('User is signed in, showing MainNavigation');
+            return const MainNavigation();
           }
           
           print('User is not signed in, showing LoginScreen');
@@ -61,7 +61,7 @@ class MyApp extends StatelessWidget {
       ),
       routes: {
         '/login': (context) => const LoginScreen(),
-        '/home': (context) => const HomeScreen(),
+        '/home': (context) => const MainNavigation(),
       },
     );
   }
