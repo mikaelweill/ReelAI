@@ -1,22 +1,33 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
-    region: 'us-central1',
-  );
 
   Future<void> sendSignInLinkToEmail(String email) async {
     try {
-      // Make sure this matches the function name in main.py
-      final callable = _functions.httpsCallable('send_magic_link_email');
-      final result = await callable.call({
-        'email': email,
-      });
+      // Configure sign-in link settings
+      var actionCodeSettings = ActionCodeSettings(
+        url: 'https://reelai-c8ef6.web.app/finishSignUp?email=$email',
+        handleCodeInApp: true,
+        iOSBundleId: 'com.reelai.app',
+        androidPackageName: 'com.reelai.reelai',
+        androidInstallApp: true,
+        androidMinimumVersion: '12',
+      );
 
-      // The function should return a success message
-      print('Magic link sent: ${result.data}');
+      // Send sign-in link directly using Firebase Auth
+      await _auth.sendSignInLinkToEmail(
+        email: email,
+        actionCodeSettings: actionCodeSettings,
+      );
+
+      // Save the email locally to use it later
+      SharedPreferences storage = await SharedPreferences.getInstance();
+      await storage.setString('emailForSignIn', email);
+      
+      print('Magic link sent successfully');
     } catch (e) {
       print('Error sending magic link: $e');
       rethrow;

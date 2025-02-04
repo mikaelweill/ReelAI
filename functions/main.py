@@ -5,6 +5,11 @@
 import firebase_functions.https_fn as https_fn
 from firebase_admin import initialize_app, auth
 import os
+import logging
+
+# Add this at the top of the file
+logger = logging.getLogger('firebase_functions')
+logger.setLevel(logging.DEBUG)
 
 # Initialize without explicit credentials - it will use the default service account
 initialize_app()
@@ -18,39 +23,80 @@ def send_magic_link_email(request):
         if not email:
             return {'error': 'Email is required', 'success': False}
             
-        # Generate a sign-in link
-        action_code_settings = auth.ActionCodeSettings(
-            url=f'https://reelai-c8ef6.firebaseapp.com/finishSignUp?email={email}',
-            handle_code_in_app=True,
-            ios_bundle_id='com.reelai.app',
-            android_package_name='com.reelai.reelai',
-            android_install_app=True,
-            android_minimum_version='12'
-        )
-        
+        logger.info(f'Attempting to send magic link to: {email}')
+            
         try:
-            # This will both generate AND send the email
-            auth.generate_sign_in_with_email_link(
-                email,
-                action_code_settings,
-                app=None  # Use default Firebase app
+            # First create the user
+            user = auth.create_user(
+                email=email,
+                email_verified=False
+            )
+            logger.info(f'Created new user: {user.uid}')
+            
+            # Generate the action code settings
+            action_code_settings = auth.ActionCodeSettings(
+                url=f'https://reelai-c8ef6.web.app/finishSignUp?email={email}',
+                handle_code_in_app=True,
+                ios_bundle_id='com.reelai.app',
+                android_package_name='com.reelai.reelai',
+                android_install_app=True,
+                android_minimum_version='12',
+                dynamic_link_domain='relai.page.link'
             )
             
-            return {
-                'success': True,
-                'message': 'Magic link sent successfully'
-                # Don't return the link in production for security
-            }
+            try:
+                # First create the user
+                user = auth.create_user(
+                    email=email,
+                    email_verified=False
+                )
+                logger.info(f'Created new user: {user.uid}')
+                
+                # Generate and send the verification link
+                link = auth.generate_email_verification_link(
+                    email,
+                    action_code_settings
+                )
+                
+                # The link contains the email verification URL
+                # Now we need to manually send this email using a proper email service
+                # For now, let's return the link so we can verify it's being generated
+                logger.info(f'Generated verification link: {link}')
+                
+                return {
+                    'success': True,
+                    'message': 'Magic link generated successfully',
+                    'userId': user.uid,
+                    'link': link  # Return the link for debugging
+                }
+                
+            except auth.EmailAlreadyExistsError:
+                # For existing users, generate a sign-in link
+                link = auth.generate_sign_in_with_email_link(
+                    email,
+                    action_code_settings
+                )
+                
+                logger.info(f'Generated sign-in link for existing user: {link}')
+                
+                return {
+                    'success': True,
+                    'message': 'Magic link generated successfully',
+                    'link': link  # Return the link for debugging
+                }
+            
         except Exception as auth_error:
-            print(f'Auth error: {str(auth_error)}')
+            logger.error(f'Detailed auth error: {str(auth_error)}')
+            logger.error(f'Auth error type: {type(auth_error)}')
             return {
-                'error': 'Failed to generate sign-in link',
+                'error': 'Failed to send sign-in link',
                 'details': str(auth_error),
                 'success': False
             }
         
     except Exception as e:
-        print(f'Error in send_magic_link_email: {str(e)}')
+        logger.error(f'Detailed error in send_magic_link_email: {str(e)}')
+        logger.error(f'Error type: {type(e)}')
         return {
             'error': str(e),
             'success': False
