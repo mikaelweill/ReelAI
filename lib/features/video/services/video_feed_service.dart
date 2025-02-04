@@ -9,6 +9,9 @@ class Video {
   final int duration;
   final double aspectRatio;
   final String status;
+  final String? title;
+  final String? description;
+  final bool isPrivate;
 
   Video({
     required this.id,
@@ -18,6 +21,9 @@ class Video {
     required this.duration,
     required this.aspectRatio,
     required this.status,
+    this.title,
+    this.description,
+    this.isPrivate = false,
   });
 
   factory Video.fromFirestore(DocumentSnapshot doc) {
@@ -30,6 +36,9 @@ class Video {
       duration: data['duration'] ?? 0,
       aspectRatio: (data['aspectRatio'] ?? 1.0).toDouble(),
       status: data['status'] ?? 'ready',
+      title: data['title'],
+      description: data['description'],
+      isPrivate: data['isPrivate'] ?? false,
     );
   }
 }

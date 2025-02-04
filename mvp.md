@@ -72,17 +72,21 @@
    - Private: Only visible to creator
    - Public: Visible in main feed
 
-2. My Videos Section
-   - New tab in bottom navigation
-   - Display grid/list of user's videos
-   - Show both private and public videos
-   - Sort by creation date (newest first)
-   - Visual indicator for private/public status
-
-3. Upload Flow Enhancement
-   - Add "Save as Private" vs "Publish" options
+2. Video Upload Enhancement
+   - Add title prompt when saving/publishing
+   - Required title field for all videos
+   - Option to add description (optional)
    - Show upload progress
-   - Allow editing privacy settings after upload
+   - Preview thumbnail in upload dialog
+
+3. My Videos Section UI Improvements
+   - Clean card-based layout with proper spacing
+   - Display video title prominently
+   - Show creation date in readable format
+   - Add video thumbnail/preview
+   - Consistent padding and margins
+   - Material Design elevation for cards
+   - Clear visual hierarchy
 
 ### Database Structure
 #### Videos Collection
@@ -91,6 +95,8 @@ videos/{videoId}
 {
   userId: string,
   videoUrl: string,
+  title: string,        // New required field
+  description: string,  // New optional field
   createdAt: timestamp,
   duration: number,
   size: number,
@@ -137,21 +143,32 @@ videos/{videoId}
    - videos by likes (for trending)
 
 ### Implementation Plan (Minimal Changes Required)
-1. Database Updates
+1. Upload Flow Updates
+   - Add title input dialog before upload
+   - Validate title (required, min/max length)
+   - Store title in Firestore
+
+2. UI Enhancements
+   - Redesign video cards with Material Design
+   - Add proper spacing and margins
+   - Implement consistent typography
+   - Show video titles prominently
+
+3. Database Updates
    - Add `isPrivate` field to existing video schema
    - No migration needed, default to public for existing videos
 
-2. UI Changes
+4. UI Changes
    - Add bottom navigation bar with Home and My Videos tabs
    - Reuse existing video player component
    - Simple toggle for private/public status
 
-3. Service Layer Updates
+5. Service Layer Updates
    - Modify video feed query to filter private videos
    - Add query for user's videos (both private and public)
    - Add privacy toggle functionality
 
-4. Upload Flow
+6. Upload Flow
    - Add simple dialog with Save/Publish options
    - Update upload completion handler
 
