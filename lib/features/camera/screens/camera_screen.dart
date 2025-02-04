@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'video_preview_screen.dart';
 
 class CameraScreen extends StatefulWidget {
   final List<CameraDescription> cameras;
@@ -17,17 +18,22 @@ class _CameraScreenState extends State<CameraScreen> {
   late CameraController _controller;
   bool _isInitialized = false;
   bool _isRecording = false;
+  late CameraDescription _currentCamera;
 
   @override
   void initState() {
     super.initState();
+    // Find the front camera
+    _currentCamera = widget.cameras.firstWhere(
+      (camera) => camera.lensDirection == CameraLensDirection.front,
+      orElse: () => widget.cameras.first,
+    );
     _initializeCamera();
   }
 
   Future<void> _initializeCamera() async {
-    final camera = widget.cameras.first;
     _controller = CameraController(
-      camera,
+      _currentCamera,
       ResolutionPreset.high,
       enableAudio: true,
     );
@@ -42,6 +48,33 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
+  Future<void> _flipCamera() async {
+    final lensDirection = _currentCamera.lensDirection;
+    CameraDescription newCamera;
+    
+    if (lensDirection == CameraLensDirection.front) {
+      newCamera = widget.cameras.firstWhere(
+        (camera) => camera.lensDirection == CameraLensDirection.back,
+        orElse: () => _currentCamera,
+      );
+    } else {
+      newCamera = widget.cameras.firstWhere(
+        (camera) => camera.lensDirection == CameraLensDirection.front,
+        orElse: () => _currentCamera,
+      );
+    }
+
+    if (newCamera != _currentCamera) {
+      setState(() {
+        _isInitialized = false;
+        _currentCamera = newCamera;
+      });
+      
+      await _controller.dispose();
+      await _initializeCamera();
+    }
+  }
+
   Future<void> _toggleRecording() async {
     if (_controller.value.isRecordingVideo) {
       try {
@@ -49,9 +82,19 @@ class _CameraScreenState extends State<CameraScreen> {
         setState(() {
           _isRecording = false;
         });
-        print('Video saved to: ${file.path}');
-        // Here you would typically handle the recorded video
-        // For example, show a preview or upload it
+        
+        if (mounted) {
+          final result = await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => VideoPreviewScreen(videoPath: file.path),
+            ),
+          );
+          
+          if (result == true) {
+            // Video was published, go back to home
+            Navigator.of(context).pop();
+          }
+        }
       } catch (e) {
         print('Error stopping recording: $e');
       }
@@ -77,8 +120,11 @@ class _CameraScreenState extends State<CameraScreen> {
   Widget build(BuildContext context) {
     if (!_isInitialized) {
       return const Scaffold(
+        backgroundColor: Colors.black,
         body: Center(
-          child: CircularProgressIndicator(),
+          child: CircularProgressIndicator(
+            color: Colors.white,
+          ),
         ),
       );
     }
@@ -93,17 +139,33 @@ class _CameraScreenState extends State<CameraScreen> {
               child: CameraPreview(_controller),
             ),
             
-            // Close Button
+            // Top Controls
             Positioned(
               top: 16,
-              right: 16,
-              child: IconButton(
-                icon: const Icon(
-                  Icons.close,
-                  color: Colors.white,
-                  size: 28,
-                ),
-                onPressed: () => Navigator.of(context).pop(),
+              left: 0,
+              right: 0,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Close Button
+                  IconButton(
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                  // Flip Camera Button
+                  IconButton(
+                    icon: const Icon(
+                      Icons.flip_camera_ios,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                    onPressed: _flipCamera,
+                  ),
+                ],
               ),
             ),
             
