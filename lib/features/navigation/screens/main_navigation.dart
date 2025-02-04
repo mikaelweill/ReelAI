@@ -3,6 +3,7 @@ import 'package:camera/camera.dart';
 import '../../home/screens/home_screen.dart';
 import '../../video/screens/feed_screen.dart';
 import '../../camera/screens/camera_screen.dart';
+import '../../video/screens/upload_screen.dart';
 import '../../auth/services/auth_service.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -35,16 +36,60 @@ class _MainNavigationState extends State<MainNavigation> {
     }
   }
 
+  void _showUploadOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.black87,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.videocam, color: Colors.white, size: 32),
+              title: const Text(
+                'Record Video',
+                style: TextStyle(color: Colors.white, fontSize: 18),
+              ),
+              onTap: () {
+                Navigator.pop(context); // Close bottom sheet
+                if (_isCameraInitialized) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => CameraScreen(cameras: cameras),
+                    ),
+                  );
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: Colors.white, size: 32),
+              title: const Text(
+                'Choose from Gallery',
+                style: TextStyle(color: Colors.white, fontSize: 18),
+              ),
+              onTap: () {
+                Navigator.pop(context); // Close bottom sheet
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const UploadScreen(),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _onItemTapped(int index) {
     if (index == 1) {
-      // Camera button tapped
-      if (_isCameraInitialized) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => CameraScreen(cameras: cameras),
-          ),
-        );
-      }
+      // Show upload options
+      _showUploadOptions();
     } else {
       setState(() {
         _selectedIndex = index;
