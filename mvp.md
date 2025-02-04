@@ -20,7 +20,7 @@
 - Initialize Firebase in the app ✓
 - Configure App Check ✓
 
-## Phase 2: Authentication Flow (In Progress)
+## Phase 2: Authentication Flow ✓
 
 ### Email/Password Authentication ✓
 1. Create authentication service ✓
@@ -36,15 +36,27 @@
    - Bio (optional)
 3. Profile edit screen
 
-## Phase 3: Core Features (Upcoming)
+## Phase 3: Core Features (In Progress)
 
-### Camera Implementation
-- Camera permission handling
-- Video recording interface
-- Basic video preview
-- Upload functionality
+### Camera Implementation ✓
+- Camera permission handling ✓
+- Video recording interface ✓
+- Basic video preview ✓
+- Camera flip functionality ✓
+- Preview screen with playback ✓
 
-### Feed Implementation
+### Video Storage & Management (Next)
+1. Create Firebase Storage structure
+   - `/videos/{userId}/{videoId}.mp4`
+   - `/thumbnails/{userId}/{videoId}.jpg`
+2. Implement video upload service
+   - Upload video to Firebase Storage
+   - Generate and upload thumbnail
+   - Create video metadata in Firestore
+3. Add upload progress indicator
+4. Handle upload errors and retries
+
+### Feed Implementation (Upcoming)
 - Vertical scrolling video feed
 - Video player with autoplay
 - Basic engagement buttons (like, comment)
@@ -74,16 +86,19 @@ videos/{videoId}
   thumbnailUrl: string,
   likes: number,
   comments: number,
-  createdAt: timestamp
+  createdAt: timestamp,
+  duration: number,
+  size: number,
+  aspectRatio: number
 }
 ```
 
 ## Next Steps Priority:
-1. Implement user profile creation after signup
-2. Create profile screen with edit functionality
-3. Set up camera interface for video recording
-4. Implement video upload to Firebase Storage
-5. Create basic video feed
+1. ✓ Implement basic camera functionality
+2. ✓ Add video preview and playback
+3. → Implement video upload to Firebase Storage (Current Task)
+4. Create video feed screen
+5. Add video playback in feed
 
 ## Future Enhancements:
 - Comments system
@@ -91,3 +106,5 @@ videos/{videoId}
 - User following
 - Video sharing
 - Push notifications
+- Video filters and effects
+- Background music

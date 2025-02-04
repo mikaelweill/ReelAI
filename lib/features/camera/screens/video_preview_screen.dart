@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+import '../../video/services/video_upload_service.dart';
 
 class VideoPreviewScreen extends StatefulWidget {
   final String videoPath;
@@ -16,7 +17,10 @@ class VideoPreviewScreen extends StatefulWidget {
 
 class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
   late VideoPlayerController _controller;
+  final VideoUploadService _uploadService = VideoUploadService();
   bool _isPlaying = false;
+  bool _isUploading = false;
+  double _uploadProgress = 0.0;
 
   @override
   void initState() {
@@ -42,11 +46,33 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
   }
 
   Future<void> _handlePublish() async {
-    // TODO: Implement video upload to Firebase
-    print('Publishing video from: ${widget.videoPath}');
-    // For now, just go back to camera
-    if (mounted) {
-      Navigator.of(context).pop(true); // true indicates published
+    setState(() {
+      _isUploading = true;
+    });
+
+    try {
+      await _uploadService.uploadVideo(
+        filePath: widget.videoPath,
+        onProgress: (progress) {
+          setState(() {
+            _uploadProgress = progress;
+          });
+        },
+      );
+      
+      if (mounted) {
+        Navigator.of(context).pop(true); // true indicates published
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed: $e')),
+        );
+        setState(() {
+          _isUploading = false;
+          _uploadProgress = 0.0;
+        });
+      }
     }
   }
 
@@ -77,7 +103,7 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
             ),
 
             // Play/Pause Button Overlay
-            Center(
+            if (!_isUploading) Center(
               child: GestureDetector(
                 onTap: _togglePlayPause,
                 child: Container(
@@ -104,6 +130,28 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
               ),
             ),
 
+            // Upload Progress Overlay
+            if (_isUploading) Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(
+                    value: _uploadProgress,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    '${(_uploadProgress * 100).toStringAsFixed(0)}%',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             // Bottom Actions
             Positioned(
               bottom: 32,
@@ -112,22 +160,24 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  IconButton(
-                    icon: const Icon(
-                      Icons.delete,
-                      color: Colors.white,
-                      size: 32,
+                  if (!_isUploading) ...[
+                    IconButton(
+                      icon: const Icon(
+                        Icons.delete,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                      onPressed: _handleDelete,
                     ),
-                    onPressed: _handleDelete,
-                  ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.check_circle,
-                      color: Colors.green,
-                      size: 48,
+                    IconButton(
+                      icon: const Icon(
+                        Icons.check_circle,
+                        color: Colors.green,
+                        size: 48,
+                      ),
+                      onPressed: _handlePublish,
                     ),
-                    onPressed: _handlePublish,
-                  ),
+                  ],
                 ],
               ),
             ),
