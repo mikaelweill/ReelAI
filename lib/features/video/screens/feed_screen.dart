@@ -14,25 +14,34 @@ class _FeedScreenState extends State<FeedScreen> {
   final VideoFeedService _feedService = VideoFeedService();
   final Map<String, VideoPlayerController> _controllers = {};
   static const int _maxControllers = 3;  // Maximum number of active controllers
+  String? _currentlyPlayingUrl;  // Track which video is currently playing
 
   @override
   void dispose() {
-    try {
-      for (var controller in _controllers.values) {
-        if (controller.value.isInitialized) {
-          controller.dispose();
-        }
-      }
-      _controllers.clear();
-    } catch (e) {
-      print('Error disposing controllers: $e');
+    for (var controller in _controllers.values) {
+      controller.dispose();
     }
+    _controllers.clear();
     super.dispose();
+  }
+
+  Future<void> _disposeController(String videoUrl) async {
+    try {
+      final controller = _controllers.remove(videoUrl);
+      if (controller != null) {
+        await controller.pause();
+        await controller.dispose();
+      }
+      if (_currentlyPlayingUrl == videoUrl) {
+        _currentlyPlayingUrl = null;
+      }
+    } catch (e) {
+      print('Error disposing controller: $e');
+    }
   }
 
   Future<VideoPlayerController?> _getController(String videoUrl) async {
     try {
-      // Return existing controller if available
       if (_controllers.containsKey(videoUrl)) {
         return _controllers[videoUrl];
       }
@@ -46,7 +55,7 @@ class _FeedScreenState extends State<FeedScreen> {
       print('Initializing video controller for: $videoUrl');
       final controller = VideoPlayerController.networkUrl(
         Uri.parse(videoUrl),
-        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),  // Ensure audio doesn't mix
       );
       
       try {
@@ -66,16 +75,27 @@ class _FeedScreenState extends State<FeedScreen> {
     }
   }
 
-  Future<void> _disposeController(String videoUrl) async {
-    try {
-      final controller = _controllers.remove(videoUrl);
-      if (controller != null) {
-        print('Disposing controller for: $videoUrl');
-        await controller.pause();
-        await controller.dispose();
+  void onVideoVisibilityChanged(String videoUrl, bool isVisible) async {
+    if (!mounted) return;
+
+    final controller = _controllers[videoUrl];
+    if (controller == null) return;
+
+    if (isVisible) {
+      // Pause any currently playing video
+      if (_currentlyPlayingUrl != null && _currentlyPlayingUrl != videoUrl) {
+        final currentController = _controllers[_currentlyPlayingUrl];
+        if (currentController != null) {
+          await currentController.pause();
+        }
       }
-    } catch (e) {
-      print('Error disposing controller: $e');
+      // Play the new video
+      _currentlyPlayingUrl = videoUrl;
+      await controller.play();
+    } else if (_currentlyPlayingUrl == videoUrl) {
+      // Pause if this video was playing and is now hidden
+      await controller.pause();
+      _currentlyPlayingUrl = null;
     }
   }
 
@@ -150,6 +170,7 @@ class _FeedScreenState extends State<FeedScreen> {
                   return VideoCard(
                     video: video,
                     controller: controllerSnapshot.data!,
+                    onVisibilityChanged: (isVisible) => onVideoVisibilityChanged(video.videoUrl, isVisible),
                   );
                 },
               );

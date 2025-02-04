@@ -8,6 +8,7 @@ class VideoCard extends StatefulWidget {
   final VideoPlayerController controller;
   final VoidCallback? onDelete;
   final bool showPrivacyIndicator;
+  final Function(bool)? onVisibilityChanged;
 
   const VideoCard({
     super.key,
@@ -15,6 +16,7 @@ class VideoCard extends StatefulWidget {
     required this.controller,
     this.onDelete,
     this.showPrivacyIndicator = false,
+    this.onVisibilityChanged,
   });
 
   @override
@@ -90,11 +92,7 @@ class _VideoCardState extends State<VideoCard> {
         _isVisible = info.visibleFraction > 0.5;  // Only consider visible if more than half shown
         
         if (wasVisible != _isVisible) {
-          if (_isVisible) {
-            widget.controller.play();
-          } else {
-            widget.controller.pause();
-          }
+          widget.onVisibilityChanged?.call(_isVisible);
         }
       },
       child: Card(
@@ -115,11 +113,12 @@ class _VideoCardState extends State<VideoCard> {
                     Positioned.fill(
                       child: GestureDetector(
                         onTap: () {
-                          setState(() {
-                            widget.controller.value.isPlaying
-                                ? widget.controller.pause()
-                                : widget.controller.play();
-                          });
+                          if (widget.controller.value.isPlaying) {
+                            widget.controller.pause();
+                          } else {
+                            // When playing, notify parent to handle coordination
+                            widget.onVisibilityChanged?.call(true);
+                          }
                         },
                         child: Container(
                           color: Colors.transparent,
