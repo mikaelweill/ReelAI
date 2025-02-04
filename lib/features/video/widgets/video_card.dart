@@ -89,7 +89,7 @@ class _VideoCardState extends State<VideoCard> {
       key: Key(widget.video.id),
       onVisibilityChanged: (info) {
         final wasVisible = _isVisible;
-        _isVisible = info.visibleFraction > 0.5;  // Only consider visible if more than half shown
+        _isVisible = info.visibleFraction > 0.7;  // Only consider visible if more than 70% shown
         
         if (wasVisible != _isVisible) {
           widget.onVisibilityChanged?.call(_isVisible);
