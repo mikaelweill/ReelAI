@@ -4,44 +4,56 @@
 
 import firebase_functions.https_fn as https_fn
 from firebase_admin import initialize_app, auth
-from firebase_admin.auth import EmailAlreadyExistsError
 import os
 
+# Initialize without explicit credentials - it will use the default service account
 initialize_app()
 
-@https_fn.on_call()
+@https_fn.on_call(
+    invoker="public"  # Allow public access
+)
 def send_magic_link_email(request):
-    data = request.data
-    email = data.get('email')
-    
-    if not email:
-        return {'error': 'Email is required'}
-        
     try:
+        data = request.data
+        email = data.get('email')
+        
+        if not email:
+            return {'error': 'Email is required', 'success': False}
+            
         # Generate a sign-in link
         action_code_settings = auth.ActionCodeSettings(
-            url=f'https://relai.page.link/finishSignUp?email={email}',
+            url=f'https://reelai-c8ef6.firebaseapp.com/finishSignUp?email={email}',
             handle_code_in_app=True,
             ios_bundle_id='com.reelai.app',
-            android_package_name='com.reelai.app',
+            android_package_name='com.reelai.reelai',
             android_install_app=True,
             android_minimum_version='12'
         )
         
-        link = auth.generate_sign_in_with_email_link(
-            email,
-            action_code_settings
-        )
-        
-        return {
-            'success': True,
-            'message': 'Magic link sent successfully',
-            'link': link
-        }
+        try:
+            link = auth.generate_sign_in_with_email_link(
+                email,
+                action_code_settings
+            )
+            print(f'Generated link: {link}')
+            return {
+                'success': True,
+                'message': 'Magic link sent successfully',
+                'link': link
+            }
+        except Exception as auth_error:
+            print(f'Auth error: {str(auth_error)}')
+            return {
+                'error': 'Failed to generate sign-in link',
+                'details': str(auth_error),
+                'success': False
+            }
         
     except Exception as e:
+        print(f'Error in send_magic_link_email: {str(e)}')
         return {
-            'error': str(e)
+            'error': str(e),
+            'success': False
         }
 
 # initialize_app()
