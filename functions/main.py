@@ -9,9 +9,7 @@ import os
 # Initialize without explicit credentials - it will use the default service account
 initialize_app()
 
-@https_fn.on_call(
-    invoker="public"  # Allow public access
-)
+@https_fn.on_call()
 def send_magic_link_email(request):
     try:
         data = request.data
@@ -31,15 +29,17 @@ def send_magic_link_email(request):
         )
         
         try:
-            link = auth.generate_sign_in_with_email_link(
+            # This will both generate AND send the email
+            auth.generate_sign_in_with_email_link(
                 email,
-                action_code_settings
+                action_code_settings,
+                app=None  # Use default Firebase app
             )
-            print(f'Generated link: {link}')
+            
             return {
                 'success': True,
-                'message': 'Magic link sent successfully',
-                'link': link
+                'message': 'Magic link sent successfully'
+                # Don't return the link in production for security
             }
         except Exception as auth_error:
             print(f'Auth error: {str(auth_error)}')
