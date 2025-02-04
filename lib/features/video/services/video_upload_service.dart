@@ -2,83 +2,120 @@ import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:video_player/video_player.dart';
+import 'package:path/path.dart' as path;
+import 'video_compression_service.dart';
 
 class VideoUploadService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final VideoCompressionService _compressionService = VideoCompressionService();
 
-  Future<String> uploadVideo({
+  Future<String?> uploadVideo({
     required String filePath,
     required String title,
     String? description,
     required bool isPrivate,
-    void Function(double)? onProgress,
+    Function(double)? onProgress,
   }) async {
-    final user = _auth.currentUser;
-    if (user == null) throw Exception('User must be logged in to upload videos');
-
-    final videoFile = File(filePath);
-    final videoId = DateTime.now().millisecondsSinceEpoch.toString();
-    final videoPath = 'videos/${user.uid}/$videoId.mp4';
-
+    File? compressedFile;
     try {
-      // Initialize video metadata
-      final videoController = VideoPlayerController.file(videoFile);
-      await videoController.initialize();
-      final duration = videoController.value.duration.inSeconds;
-      final aspectRatio = videoController.value.aspectRatio;
-      videoController.dispose();
-
-      // Upload video
-      final uploadTask = _storage.ref(videoPath).putFile(
-        videoFile,
-        SettableMetadata(contentType: 'video/mp4'),
+      // First compress the video
+      onProgress?.call(0.0);
+      print('Starting video compression...');
+      
+      final String? compressedPath = await _compressionService.compressVideo(
+        filePath,
+        onProgress: (progress) {
+          // Compression takes up first 50% of progress
+          onProgress?.call(progress * 0.5);
+        },
       );
 
-      // Monitor upload progress
+      if (compressedPath == null) {
+        throw Exception('Video compression failed');
+      }
+
+      print('Video compression complete. Starting upload...');
+
+      compressedFile = File(compressedPath);
+      if (!await compressedFile.exists()) {
+        throw Exception('Compressed file not found');
+      }
+
+      // Upload the compressed video
+      final String fileName = '${DateTime.now().millisecondsSinceEpoch}_${path.basename(filePath)}';
+      final Reference ref = _storage
+          .ref()
+          .child('videos/${_auth.currentUser!.uid}/$fileName');
+
+      final UploadTask uploadTask = ref.putFile(
+        compressedFile,
+        SettableMetadata(
+          contentType: 'video/mp4',
+          customMetadata: {
+            'title': title,
+            'isPrivate': isPrivate.toString(),
+          },
+        ),
+      );
+
+      // Track upload progress
       uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
-        final progress = snapshot.bytesTransferred / snapshot.totalBytes;
-        onProgress?.call(progress);
+        final double uploadProgress = snapshot.bytesTransferred / snapshot.totalBytes;
+        // Upload takes up second 50% of progress
+        onProgress?.call(0.5 + (uploadProgress * 0.5));
       });
 
       // Wait for upload to complete
-      final snapshot = await uploadTask;
-      final videoUrl = await snapshot.ref.getDownloadURL();
+      final TaskSnapshot snapshot = await uploadTask;
+      final String downloadUrl = await snapshot.ref.getDownloadURL();
 
-      // Create video document in Firestore
-      await _firestore.collection('videos').doc(videoId).set({
-        'userId': user.uid,
-        'videoUrl': videoUrl,
-        'thumbnailUrl': '', // TODO: Generate and upload thumbnail
+      // Create Firestore document
+      final DocumentReference docRef = await _firestore.collection('videos').add({
+        'userId': _auth.currentUser!.uid,
+        'videoUrl': downloadUrl,
         'title': title,
-        'description': description ?? '',
+        'description': description,
         'isPrivate': isPrivate,
-        'likes': 0,
-        'comments': 0,
         'createdAt': FieldValue.serverTimestamp(),
-        'duration': duration,
-        'size': snapshot.totalBytes,
-        'aspectRatio': aspectRatio,
         'status': 'ready',
+        'size': snapshot.totalBytes,
       });
 
-      return videoId;
+      print('Upload complete. Video ID: ${docRef.id}');
+      return docRef.id;
     } catch (e) {
-      print('Error uploading video: $e');
-      rethrow;
+      print('Error in uploadVideo: $e');
+      return null;
+    } finally {
+      // Clean up compression cache
+      await _compressionService.dispose();
+      
+      // Delete the compressed file if it exists
+      try {
+        if (compressedFile != null && await compressedFile.exists()) {
+          await compressedFile.delete();
+        }
+      } catch (e) {
+        print('Error cleaning up compressed file: $e');
+      }
     }
   }
 
   Future<void> deleteVideo(String videoId) async {
-    final user = _auth.currentUser;
-    if (user == null) throw Exception('User must be logged in to delete videos');
-
     try {
+      // Get the video document
+      final doc = await _firestore.collection('videos').doc(videoId).get();
+      if (!doc.exists) return;
+
       // Delete from Storage
-      await _storage.ref('videos/${user.uid}/$videoId.mp4').delete();
-      
+      final String videoUrl = doc.data()?['videoUrl'];
+      if (videoUrl != null) {
+        final ref = _storage.refFromURL(videoUrl);
+        await ref.delete();
+      }
+
       // Delete from Firestore
       await _firestore.collection('videos').doc(videoId).delete();
     } catch (e) {

@@ -48,12 +48,34 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
   }
 
   Future<void> _handlePublish() async {
+    if (_isUploading) return; // Prevent double uploads
+
+    // Verify file exists
+    final videoFile = File(widget.videoPath);
+    if (!await videoFile.exists()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Video file not found. Please try recording again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
     // Show metadata dialog first
-    final metadata = await showDialog<VideoMetadata>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const VideoMetadataDialog(),
-    );
+    VideoMetadata? metadata;
+    try {
+      metadata = await showDialog<VideoMetadata>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const VideoMetadataDialog(),
+      );
+    } catch (e) {
+      print('Error showing metadata dialog: $e');
+      return;
+    }
 
     // If user cancelled, return
     if (metadata == null) return;
@@ -65,6 +87,9 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
     });
 
     try {
+      // Pause video during upload
+      await _controller.pause();
+      
       // Track when the upload is complete
       bool uploadFinished = false;
       String? videoId = await _uploadService.uploadVideo(
@@ -73,11 +98,14 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
         description: metadata.description,
         isPrivate: metadata.isPrivate,
         onProgress: (progress) {
+          if (!mounted) return; // Safety check
+          
           setState(() {
             _uploadProgress = progress;
             if (progress >= 1.0 && !uploadFinished) {
               uploadFinished = true;
               _uploadComplete = true;
+              
               // Auto-navigate after showing "Upload Complete" for 2 seconds
               Future.delayed(const Duration(seconds: 2), () {
                 if (mounted) {
@@ -88,13 +116,20 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
           });
         },
       );
+
+      // If upload failed but we didn't catch an error
+      if (videoId == null && mounted) {
+        throw Exception('Upload failed to complete');
+      }
+
     } catch (e) {
+      print('Upload error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Upload failed: $e'),
+          const SnackBar(
+            content: Text('Upload failed. Please check your connection and try again.'),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
+            duration: Duration(seconds: 3),
           ),
         );
         setState(() {
@@ -107,13 +142,26 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
   }
 
   void _handleDelete() {
-    File(widget.videoPath).delete();
-    Navigator.of(context).pop({'success': false, 'shouldClose': false}); // Return with no close request
+    try {
+      final file = File(widget.videoPath);
+      if (file.existsSync()) {
+        file.deleteSync();
+      }
+    } catch (e) {
+      print('Error deleting file: $e');
+    }
+    if (mounted) {
+      Navigator.of(context).pop({'success': false, 'shouldClose': false});
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    try {
+      _controller.dispose();
+    } catch (e) {
+      print('Error disposing video controller: $e');
+    }
     super.dispose();
   }
 

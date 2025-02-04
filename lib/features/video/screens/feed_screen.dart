@@ -17,14 +17,18 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   void dispose() {
     try {
-      for (var controller in _controllers.values) {
-        if (controller != null && controller.value.isInitialized) {
+      print('Disposing all controllers...');
+      for (var entry in _controllers.entries) {
+        print('Disposing controller for: ${entry.key}');
+        final controller = entry.value;
+        if (controller.value.isInitialized) {
+          controller.pause();
           controller.dispose();
         }
       }
       _controllers.clear();
     } catch (e) {
-      print('Error disposing controllers: $e');
+      print('Error during feed screen disposal: $e');
     }
     super.dispose();
   }
@@ -35,23 +39,39 @@ class _FeedScreenState extends State<FeedScreen> {
         return _controllers[videoUrl];
       }
 
+      // Clean up old controllers if we have too many
+      if (_controllers.length >= 3) {  // Keep only 3 videos in memory
+        final oldestUrl = _controllers.keys.first;
+        await _disposeController(oldestUrl);
+      }
+
+      print('Initializing video controller for: $videoUrl');
       final controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
-      await controller.initialize();
-      await controller.setLooping(true);
-      _controllers[videoUrl] = controller;
-      return controller;
+      
+      try {
+        await controller.initialize();
+        await controller.setLooping(true);
+        _controllers[videoUrl] = controller;
+        print('Successfully initialized video: $videoUrl');
+        return controller;
+      } catch (initError) {
+        print('Error initializing specific video: $initError');
+        await controller.dispose();
+        return null;
+      }
     } catch (e) {
-      print('Error initializing video controller: $e');
+      print('Error in _getController: $e');
       return null;
     }
   }
 
-  void _disposeController(String videoUrl) {
+  Future<void> _disposeController(String videoUrl) async {
     try {
       final controller = _controllers.remove(videoUrl);
-      if (controller != null && controller.value.isInitialized) {
-        controller.pause();
-        controller.dispose();
+      if (controller != null) {
+        print('Disposing controller for: $videoUrl');
+        await controller.pause();
+        await controller.dispose();
       }
     } catch (e) {
       print('Error disposing controller: $e');

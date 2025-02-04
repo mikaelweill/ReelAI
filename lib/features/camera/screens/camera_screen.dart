@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'dart:async';
 import 'video_preview_screen.dart';
+import 'dart:io';
 
 class CameraScreen extends StatefulWidget {
   final List<CameraDescription> cameras;
@@ -53,6 +54,17 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
 
     try {
       await _controller.initialize();
+      
+      // Log camera settings
+      final previewSize = _controller.value.previewSize;
+      
+      print('Camera Settings:');
+      print('Preview Size: ${previewSize?.width}x${previewSize?.height}');
+      print('Camera Description:');
+      print('- Name: ${_currentCamera.name}');
+      print('- Lens Direction: ${_currentCamera.lensDirection}');
+      print('- Sensor Orientation: ${_currentCamera.sensorOrientation}°');
+      
       setState(() {
         _isInitialized = true;
       });
@@ -96,6 +108,11 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
           _isRecording = true;
         });
         _progressController.forward(from: 0.0);
+        
+        // Log recording settings
+        final previewSize = _controller.value.previewSize;
+        print('Started Recording:');
+        print('Recording Size: ${previewSize?.width}x${previewSize?.height}');
       } catch (e) {
         print('Error starting recording: $e');
       }
@@ -105,36 +122,79 @@ class _CameraScreenState extends State<CameraScreen> with SingleTickerProviderSt
   Future<void> _stopRecording() async {
     if (_controller.value.isRecordingVideo) {
       try {
+        // Reset animation first
         _progressController.stop();
-        final file = await _controller.stopVideoRecording();
         setState(() {
           _isRecording = false;
         });
+
+        // Then handle video
+        final file = await _controller.stopVideoRecording();
         
-        if (mounted) {
+        // Log video file properties
+        final videoFile = File(file.path);
+        final fileSize = await videoFile.length();
+        print('Recorded Video Properties:');
+        print('File Size: ${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB');
+        print('File Path: ${file.path}');
+        
+        if (!mounted) return;  // Safety check before navigation
+
+        try {
           final result = await Navigator.of(context).push(
             MaterialPageRoute(
               builder: (context) => VideoPreviewScreen(videoPath: file.path),
             ),
           );
           
-          if (result != null && result is Map<String, dynamic>) {
-            if (result['shouldClose'] == true) {
+          // Only attempt navigation if still mounted
+          if (mounted) {
+            if (result != null && result is Map<String, dynamic> && result['shouldClose'] == true) {
               Navigator.of(context).pop();
             }
+          }
+        } catch (navError) {
+          // If preview screen fails, at least stop recording cleanly
+          print('Error navigating to preview: $navError');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Failed to preview video. Please try again.'),
+                duration: Duration(seconds: 2),
+              ),
+            );
           }
         }
       } catch (e) {
         print('Error stopping recording: $e');
+        // Reset state and show error
+        setState(() {
+          _isRecording = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to save video. Please try again.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
       }
     }
   }
 
   @override
   void dispose() {
-    _progressController.dispose();
-    _recordingTimer?.cancel();
-    _controller.dispose();
+    try {
+      _progressController.dispose();
+      _recordingTimer?.cancel();
+      if (_controller.value.isRecordingVideo) {
+        _controller.stopVideoRecording();
+      }
+      _controller.dispose();
+    } catch (e) {
+      print('Error during cleanup: $e');
+    }
     super.dispose();
   }
 
