@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import '../services/video_feed_service.dart';
+import '../widgets/video_card.dart';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -15,96 +16,46 @@ class _FeedScreenState extends State<FeedScreen> {
 
   @override
   void dispose() {
-    for (var controller in _controllers.values) {
-      controller.dispose();
+    try {
+      for (var controller in _controllers.values) {
+        if (controller != null && controller.value.isInitialized) {
+          controller.dispose();
+        }
+      }
+      _controllers.clear();
+    } catch (e) {
+      print('Error disposing controllers: $e');
     }
     super.dispose();
   }
 
-  Future<VideoPlayerController> _getController(String videoUrl) async {
-    if (_controllers.containsKey(videoUrl)) {
-      return _controllers[videoUrl]!;
+  Future<VideoPlayerController?> _getController(String videoUrl) async {
+    try {
+      if (_controllers.containsKey(videoUrl)) {
+        return _controllers[videoUrl];
+      }
+
+      final controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
+      await controller.initialize();
+      await controller.setLooping(true);
+      _controllers[videoUrl] = controller;
+      return controller;
+    } catch (e) {
+      print('Error initializing video controller: $e');
+      return null;
     }
-
-    final controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
-    _controllers[videoUrl] = controller;
-    await controller.initialize();
-    await controller.setLooping(true);
-    return controller;
   }
 
-  Widget _buildVideoCard(Video video, VideoPlayerController controller) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-            child: AspectRatio(
-              aspectRatio: video.aspectRatio,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  VideoPlayer(controller),
-                  IconButton(
-                    icon: Icon(
-                      controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
-                      size: 50,
-                      color: Colors.white,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        controller.value.isPlaying
-                            ? controller.pause()
-                            : controller.play();
-                      });
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  video.title,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                if (video.description?.isNotEmpty == true) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    video.description!,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Created: ${_formatDate(video.createdAt)}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[400],
-                          ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  void _disposeController(String videoUrl) {
+    try {
+      final controller = _controllers.remove(videoUrl);
+      if (controller != null && controller.value.isInitialized) {
+        controller.pause();
+        controller.dispose();
+      }
+    } catch (e) {
+      print('Error disposing controller: $e');
+    }
   }
 
   @override
@@ -141,10 +92,10 @@ class _FeedScreenState extends State<FeedScreen> {
             itemCount: videos.length,
             itemBuilder: (context, index) {
               final video = videos[index];
-              return FutureBuilder<VideoPlayerController>(
+              return FutureBuilder<VideoPlayerController?>(
                 future: _getController(video.videoUrl),
                 builder: (context, controllerSnapshot) {
-                  if (!controllerSnapshot.hasData) {
+                  if (!controllerSnapshot.hasData || controllerSnapshot.data == null) {
                     return const Card(
                       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       child: AspectRatio(
@@ -154,7 +105,10 @@ class _FeedScreenState extends State<FeedScreen> {
                     );
                   }
 
-                  return _buildVideoCard(video, controllerSnapshot.data!);
+                  return VideoCard(
+                    video: video,
+                    controller: controllerSnapshot.data!,
+                  );
                 },
               );
             },
