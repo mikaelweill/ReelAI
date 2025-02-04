@@ -90,9 +90,11 @@ class _CameraScreenState extends State<CameraScreen> {
             ),
           );
           
-          if (result == true) {
-            // Video was published, go back to home
-            Navigator.of(context).pop();
+          // Check if we should close the camera screen
+          if (result != null && result is Map<String, dynamic>) {
+            if (result['shouldClose'] == true) {
+              Navigator.of(context).pop(); // Close camera screen
+            }
           }
         }
       } catch (e) {

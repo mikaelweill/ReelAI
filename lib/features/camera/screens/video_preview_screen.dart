@@ -20,6 +20,7 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
   final VideoUploadService _uploadService = VideoUploadService();
   bool _isPlaying = false;
   bool _isUploading = false;
+  bool _uploadComplete = false;
   double _uploadProgress = 0.0;
 
   @override
@@ -48,29 +49,44 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
   Future<void> _handlePublish() async {
     setState(() {
       _isUploading = true;
+      _uploadComplete = false;
+      _uploadProgress = 0.0;
     });
 
     try {
-      await _uploadService.uploadVideo(
+      // Track when the upload is complete
+      bool uploadFinished = false;
+      String? videoId = await _uploadService.uploadVideo(
         filePath: widget.videoPath,
         onProgress: (progress) {
           setState(() {
             _uploadProgress = progress;
+            if (progress >= 1.0 && !uploadFinished) {
+              uploadFinished = true;
+              _uploadComplete = true;
+              // Auto-navigate after showing "Upload Complete" for 2 seconds
+              Future.delayed(const Duration(seconds: 2), () {
+                if (mounted) {
+                  Navigator.of(context).pop({'success': true, 'shouldClose': true});
+                }
+              });
+            }
           });
         },
       );
-      
-      if (mounted) {
-        Navigator.of(context).pop(true); // true indicates published
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload failed: $e')),
+          SnackBar(
+            content: Text('Upload failed: $e'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
         );
         setState(() {
           _isUploading = false;
           _uploadProgress = 0.0;
+          _uploadComplete = false;
         });
       }
     }
@@ -78,7 +94,7 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
 
   void _handleDelete() {
     File(widget.videoPath).delete();
-    Navigator.of(context).pop(false); // false indicates deleted/cancelled
+    Navigator.of(context).pop({'success': false, 'shouldClose': false}); // Return with no close request
   }
 
   @override
@@ -130,18 +146,25 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
               ),
             ),
 
-            // Upload Progress Overlay
+            // Upload Progress/Success Overlay
             if (_isUploading) Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircularProgressIndicator(
+                  if (!_uploadComplete) CircularProgressIndicator(
                     value: _uploadProgress,
                     color: Colors.white,
                   ),
+                  if (_uploadComplete) const Icon(
+                    Icons.check_circle,
+                    color: Colors.green,
+                    size: 50,
+                  ),
                   const SizedBox(height: 16),
                   Text(
-                    '${(_uploadProgress * 100).toStringAsFixed(0)}%',
+                    _uploadComplete
+                        ? 'Upload Complete!'
+                        : '${(_uploadProgress * 100).toStringAsFixed(0)}%',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 20,
