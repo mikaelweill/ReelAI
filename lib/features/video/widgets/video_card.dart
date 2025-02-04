@@ -22,8 +22,63 @@ class VideoCard extends StatefulWidget {
 }
 
 class _VideoCardState extends State<VideoCard> {
+  final VideoFeedService _feedService = VideoFeedService();
+  bool _isVisible = false;
+
+  @override
+  void dispose() {
+    if (_isVisible) {
+      widget.controller.pause();
+    }
+    super.dispose();
+  }
+
   String _formatDate(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _showPrivacyConfirmation() async {
+    final isPrivate = widget.video.isPrivate;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          isPrivate 
+            ? 'Make Video Public?' 
+            : 'Make Video Private?'
+        ),
+        content: Text(
+          isPrivate
+            ? 'This video will be visible to everyone. Are you sure?'
+            : 'This video will only be visible to you. Are you sure?'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (result == true) {
+      try {
+        await _feedService.updateVideoPrivacy(widget.video.id, !isPrivate);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update privacy: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 
   @override
@@ -31,10 +86,15 @@ class _VideoCardState extends State<VideoCard> {
     return VisibilityDetector(
       key: Key(widget.video.id),
       onVisibilityChanged: (info) {
-        if (info.visibleFraction == 0) {
-          widget.controller.pause();
-        } else if (info.visibleFraction == 1) {
-          widget.controller.play();
+        final wasVisible = _isVisible;
+        _isVisible = info.visibleFraction > 0.5;  // Only consider visible if more than half shown
+        
+        if (wasVisible != _isVisible) {
+          if (_isVisible) {
+            widget.controller.play();
+          } else {
+            widget.controller.pause();
+          }
         }
       },
       child: Card(
@@ -99,14 +159,20 @@ class _VideoCardState extends State<VideoCard> {
                       if (widget.showPrivacyIndicator || widget.onDelete != null)
                         Row(
                           children: [
-                            if (widget.showPrivacyIndicator) ...[
-                              Icon(
-                                widget.video.isPrivate ? Icons.lock : Icons.public,
-                                color: Colors.grey[400],
-                                size: 20,
+                            if (widget.showPrivacyIndicator)
+                              GestureDetector(
+                                onTap: _showPrivacyConfirmation,
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      widget.video.isPrivate ? Icons.lock : Icons.public,
+                                      color: Colors.grey[400],
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                  ],
+                                ),
                               ),
-                              const SizedBox(width: 8),
-                            ],
                             if (widget.onDelete != null)
                               IconButton(
                                 icon: const Icon(Icons.delete_outline),

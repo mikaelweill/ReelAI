@@ -102,4 +102,17 @@ class VideoFeedService {
       await _firestore.collection('videos').doc(videoId).delete();
     }
   }
+
+  // Update video privacy
+  Future<void> updateVideoPrivacy(String videoId, bool isPrivate) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
+    final videoDoc = await _firestore.collection('videos').doc(videoId).get();
+    if (videoDoc.exists && videoDoc.get('userId') == userId) {
+      await _firestore.collection('videos').doc(videoId).update({
+        'isPrivate': isPrivate,
+      });
+    }
+  }
 } 

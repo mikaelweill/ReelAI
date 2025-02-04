@@ -3,6 +3,7 @@ import 'package:camera/camera.dart';
 import '../../home/screens/home_screen.dart';
 import '../../video/screens/feed_screen.dart';
 import '../../camera/screens/camera_screen.dart';
+import '../../auth/services/auth_service.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -12,6 +13,7 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
+  final AuthService _authService = AuthService();
   int _selectedIndex = 0;
   late List<CameraDescription> cameras;
   bool _isCameraInitialized = false;
@@ -52,7 +54,24 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
+    final List<String> titles = ['Feed', '', 'My Videos'];
+    
     return Scaffold(
+      appBar: _selectedIndex != 1 ? AppBar(
+        title: Text(titles[_selectedIndex]),
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await _authService.signOut();
+              if (mounted) {
+                Navigator.of(context).pushReplacementNamed('/login');
+              }
+            },
+          ),
+        ],
+      ) : null,
       body: IndexedStack(
         index: _selectedIndex,
         children: const [
