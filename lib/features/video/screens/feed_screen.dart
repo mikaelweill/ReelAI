@@ -13,40 +13,41 @@ class FeedScreen extends StatefulWidget {
 class _FeedScreenState extends State<FeedScreen> {
   final VideoFeedService _feedService = VideoFeedService();
   final Map<String, VideoPlayerController> _controllers = {};
+  static const int _maxControllers = 3;  // Maximum number of active controllers
 
   @override
   void dispose() {
     try {
-      print('Disposing all controllers...');
-      for (var entry in _controllers.entries) {
-        print('Disposing controller for: ${entry.key}');
-        final controller = entry.value;
+      for (var controller in _controllers.values) {
         if (controller.value.isInitialized) {
-          controller.pause();
           controller.dispose();
         }
       }
       _controllers.clear();
     } catch (e) {
-      print('Error during feed screen disposal: $e');
+      print('Error disposing controllers: $e');
     }
     super.dispose();
   }
 
   Future<VideoPlayerController?> _getController(String videoUrl) async {
     try {
+      // Return existing controller if available
       if (_controllers.containsKey(videoUrl)) {
         return _controllers[videoUrl];
       }
 
       // Clean up old controllers if we have too many
-      if (_controllers.length >= 3) {  // Keep only 3 videos in memory
+      if (_controllers.length >= _maxControllers) {
         final oldestUrl = _controllers.keys.first;
         await _disposeController(oldestUrl);
       }
 
       print('Initializing video controller for: $videoUrl');
-      final controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
+      final controller = VideoPlayerController.networkUrl(
+        Uri.parse(videoUrl),
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      );
       
       try {
         await controller.initialize();
@@ -81,9 +82,15 @@ class _FeedScreenState extends State<FeedScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Video Feed'),
+        backgroundColor: Colors.transparent,
         elevation: 0,
+        title: const Text(
+          'Video Feed',
+          style: TextStyle(color: Colors.white),
+        ),
       ),
       body: StreamBuilder<List<Video>>(
         stream: _feedService.getAllVideos(),
@@ -96,31 +103,46 @@ class _FeedScreenState extends State<FeedScreen> {
 
           if (!snapshot.hasData) {
             return const Center(
-              child: CircularProgressIndicator(),
+              child: CircularProgressIndicator(color: Colors.white),
             );
           }
 
           final videos = snapshot.data!;
           if (videos.isEmpty) {
             return const Center(
-              child: Text('No videos available'),
+              child: Text('No videos available', style: TextStyle(color: Colors.white)),
             );
           }
 
           return ListView.builder(
             padding: const EdgeInsets.symmetric(vertical: 8),
             itemCount: videos.length,
+            cacheExtent: 0, // Disable caching to better control video loading
             itemBuilder: (context, index) {
               final video = videos[index];
               return FutureBuilder<VideoPlayerController?>(
                 future: _getController(video.videoUrl),
                 builder: (context, controllerSnapshot) {
                   if (!controllerSnapshot.hasData || controllerSnapshot.data == null) {
-                    return const Card(
-                      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    return Container(
+                      color: Colors.black,
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       child: AspectRatio(
-                        aspectRatio: 16 / 9,
-                        child: Center(child: CircularProgressIndicator()),
+                        aspectRatio: video.aspectRatio,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            if (video.thumbnailUrl?.isNotEmpty == true)
+                              Image.network(
+                                video.thumbnailUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => const SizedBox(),
+                              ),
+                            const Center(
+                              child: CircularProgressIndicator(color: Colors.white),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   }
