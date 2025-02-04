@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
-import '../../video/services/video_feed_service.dart';
+import '../services/video_feed_service.dart';
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+class FeedScreen extends StatefulWidget {
+  const FeedScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<FeedScreen> createState() => _FeedScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _FeedScreenState extends State<FeedScreen> {
   final VideoFeedService _feedService = VideoFeedService();
   final Map<String, VideoPlayerController> _controllers = {};
 
@@ -73,11 +73,16 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  video.title?.isNotEmpty == true 
-                    ? video.title! 
-                    : 'Untitled Video',
+                  video.title,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
+                if (video.description?.isNotEmpty == true) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    video.description!,
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -87,10 +92,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: Colors.grey[400],
                           ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () => _feedService.deleteVideo(video.id),
                     ),
                   ],
                 ),
@@ -110,34 +111,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Videos'),
+        title: const Text('Video Feed'),
         elevation: 0,
-        actions: [
-          // Add a filter button to toggle between all/public/private
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.filter_list),
-            onSelected: (value) {
-              // TODO: Implement filter
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'all',
-                child: Text('All Videos'),
-              ),
-              const PopupMenuItem(
-                value: 'public',
-                child: Text('Public Only'),
-              ),
-              const PopupMenuItem(
-                value: 'private',
-                child: Text('Private Only'),
-              ),
-            ],
-          ),
-        ],
       ),
       body: StreamBuilder<List<Video>>(
-        stream: _feedService.getUserVideos(),
+        stream: _feedService.getAllVideos(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(
@@ -154,7 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
           final videos = snapshot.data!;
           if (videos.isEmpty) {
             return const Center(
-              child: Text('No videos yet. Create your first video!'),
+              child: Text('No videos available'),
             );
           }
 

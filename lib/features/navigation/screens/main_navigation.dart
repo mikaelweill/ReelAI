@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import '../../home/screens/home_screen.dart';
+import '../../video/screens/feed_screen.dart';
 import '../../camera/screens/camera_screen.dart';
 
 class MainNavigation extends StatefulWidget {
@@ -55,22 +56,27 @@ class _MainNavigationState extends State<MainNavigation> {
       body: IndexedStack(
         index: _selectedIndex,
         children: const [
-          HomeScreen(),
-          SizedBox(), // Placeholder for camera
+          FeedScreen(),  // Public videos feed
+          SizedBox(),    // Placeholder for camera
+          HomeScreen(),  // My videos (private + public)
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
-            label: 'Home',
+            label: 'Feed',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.add_circle_outline, size: 40),
             label: '',
           ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'My Videos',
+          ),
         ],
-        currentIndex: _selectedIndex,
+        currentIndex: _selectedIndex == 1 ? 0 : _selectedIndex,  // Never show camera as selected
         selectedItemColor: Colors.white,
         unselectedItemColor: Colors.grey,
         backgroundColor: Colors.black,
