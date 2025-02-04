@@ -1,0 +1,12 @@
+{
+  "functions": {
+    "source": "functions",
+    "runtime": "python311"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "database": {
+    "rules": "database.rules.json"
+  }
+}
