@@ -12,6 +12,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final VideoFeedService _feedService = VideoFeedService();
   final Map<String, VideoPlayerController> _controllers = {};
+  String _currentFilter = 'all';  // Track current filter state
 
   @override
   void dispose() {
@@ -106,18 +107,35 @@ class _HomeScreenState extends State<HomeScreen> {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
+  // Get the filtered stream based on current filter
+  Stream<List<Video>> _getFilteredVideos() {
+    switch (_currentFilter) {
+      case 'public':
+        return _feedService.getUserVideos(isPrivate: false);
+      case 'private':
+        return _feedService.getUserVideos(isPrivate: true);
+      case 'all':
+      default:
+        return _feedService.getUserVideos();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Videos'),
+        title: Text(_currentFilter == 'all' 
+          ? 'My Videos' 
+          : '${_currentFilter[0].toUpperCase()}${_currentFilter.substring(1)} Videos'),
         elevation: 0,
         actions: [
           // Add a filter button to toggle between all/public/private
           PopupMenuButton<String>(
             icon: const Icon(Icons.filter_list),
             onSelected: (value) {
-              // TODO: Implement filter
+              setState(() {
+                _currentFilter = value;
+              });
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
@@ -137,7 +155,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: StreamBuilder<List<Video>>(
-        stream: _feedService.getUserVideos(),
+        stream: _getFilteredVideos(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(

@@ -59,21 +59,29 @@ class VideoFeedService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Get all videos for the current user
-  Stream<List<Video>> getUserVideos() {
+  // Get all videos for the current user with optional privacy filter
+  Stream<List<Video>> getUserVideos({bool? isPrivate}) {
     final user = _auth.currentUser;
     if (user == null) return Stream.value([]);
 
-    return _firestore
+    var query = _firestore
         .collection('videos')
-        .where('userId', isEqualTo: user.uid)
+        .where('userId', isEqualTo: user.uid);
+    
+    // Add privacy filter if specified
+    if (isPrivate != null) {
+      query = query.where('isPrivate', isEqualTo: isPrivate);
+    }
+
+    // Always order by creation date
+    return query
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) =>
             snapshot.docs.map((doc) => Video.fromFirestore(doc)).toList());
   }
 
-  // Get all videos for the feed
+  // Get all public videos for the feed
   Stream<List<Video>> getAllVideos() {
     return _firestore
         .collection('videos')
