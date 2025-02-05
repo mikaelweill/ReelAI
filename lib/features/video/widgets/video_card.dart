@@ -129,149 +129,138 @@ class _VideoCardState extends State<VideoCard> {
       child: Container(
         color: Colors.black,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title and description section
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          widget.video.title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      if (widget.showPrivacyIndicator)
-                        GestureDetector(
-                          onTap: _showPrivacyConfirmation,
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.black45,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Icon(
-                              widget.video.isPrivate ? Icons.lock : Icons.public,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                        ),
-                      if (widget.onDelete != null) ...[
-                        const SizedBox(width: 16),
-                        GestureDetector(
-                          onTap: widget.onDelete,
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.black45,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: const Icon(
-                              Icons.delete,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  if (widget.video.description?.isNotEmpty == true) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.video.description!,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 4),
-                  Text(
-                    'Created: ${_formatDate(widget.video.createdAt)}',
-                    style: const TextStyle(
-                      color: Colors.white60,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Video section
-            Stack(
-              children: [
-                Center(
-                  child: AspectRatio(
-                    aspectRatio: widget.video.aspectRatio,
-                    child: Stack(
-                      fit: StackFit.expand,
+            // Title section - fixed height or Expanded with flex:2
+            Expanded(
+              flex: 2,  // 20% of space
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
                       children: [
-                        if (!widget.controller.value.isInitialized)
-                          Container(
-                            color: Colors.black87,
-                            child: const Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.video_library, color: Colors.white70, size: 48),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    'Loading Video...',
-                                    style: TextStyle(color: Colors.white70),
-                                  ),
-                                ],
+                        Expanded(
+                          child: Text(
+                            widget.video.title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        if (widget.showPrivacyIndicator)
+                          GestureDetector(
+                            onTap: _showPrivacyConfirmation,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.black45,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Icon(
+                                widget.video.isPrivate ? Icons.lock : Icons.public,
+                                color: Colors.white,
+                                size: 20,
                               ),
                             ),
                           ),
-                        VideoPlayer(widget.controller),
+                        if (widget.onDelete != null) ...[
+                          const SizedBox(width: 16),
+                          GestureDetector(
+                            onTap: widget.onDelete,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.black45,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Icon(
+                                Icons.delete,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
-                  ),
-                ),
-                // Video tap control
-                Positioned.fill(
-                  child: GestureDetector(
-                    onTap: () {
-                      if (widget.controller.value.isPlaying) {
-                        widget.controller.pause();
-                      } else {
-                        widget.controller.play();
-                      }
-                    },
-                    child: Container(
-                      color: Colors.transparent,
+                    if (widget.video.description?.isNotEmpty == true) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        widget.video.description!,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 4),
+                    Text(
+                      'Created: ${_formatDate(widget.video.createdAt)}',
+                      style: const TextStyle(
+                        color: Colors.white60,
+                        fontSize: 12,
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
 
-            // Chapter list
-            if (_videoEdit?.chapters.isNotEmpty == true)
-              VideoChapterList(
-                chapters: _videoEdit!.chapters,
-                currentPosition: widget.controller.value.position.inMilliseconds / 1000,
-                onSeek: (timestamp) {
-                  widget.controller.seekTo(Duration(milliseconds: (timestamp * 1000).round()));
-                },
-                isExpanded: _isChapterListExpanded,
-                onToggleExpanded: () {
-                  setState(() {
-                    _isChapterListExpanded = !_isChapterListExpanded;
-                  });
-                },
+            // Video section - Expanded with largest flex
+            Expanded(
+              flex: 6,  // 60% of space
+              child: Center(
+                child: AspectRatio(
+                  aspectRatio: widget.video.aspectRatio,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (!widget.controller.value.isInitialized)
+                        Container(
+                          color: Colors.black87,
+                          child: const Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.video_library, color: Colors.white70, size: 48),
+                                SizedBox(height: 8),
+                                Text(
+                                  'Loading Video...',
+                                  style: TextStyle(color: Colors.white70),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      VideoPlayer(widget.controller),
+                    ],
+                  ),
+                ),
               ),
+            ),
+
+            // Chapters section - fixed height or Expanded with flex:2
+            Expanded(
+              flex: 2,  // 20% of space
+              child: _videoEdit?.chapters.isNotEmpty == true
+                ? VideoChapterList(
+                    chapters: _videoEdit!.chapters,
+                    currentPosition: widget.controller.value.position.inMilliseconds / 1000,
+                    onSeek: (timestamp) {
+                      widget.controller.seekTo(Duration(milliseconds: (timestamp * 1000).round()));
+                    },
+                    isExpanded: _isChapterListExpanded,
+                    onToggleExpanded: () {
+                      setState(() {
+                        _isChapterListExpanded = !_isChapterListExpanded;
+                      });
+                    },
+                  )
+                : const SizedBox.shrink(),
+            ),
           ],
         ),
       ),
