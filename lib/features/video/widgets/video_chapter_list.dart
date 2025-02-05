@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../studio/models/video_edit.dart';
 
-class VideoChapterList extends StatelessWidget {
+class VideoChapterList extends StatefulWidget {
   final List<ChapterMark> chapters;
   final double currentPosition;
   final Function(double) onSeek;
@@ -20,12 +20,33 @@ class VideoChapterList extends StatelessWidget {
   });
 
   @override
+  State<VideoChapterList> createState() => _VideoChapterListState();
+}
+
+class _VideoChapterListState extends State<VideoChapterList> {
+  String? _highlightedId;
+
+  void _handleChapterTap(ChapterMark chapter) {
+    widget.onSeek(chapter.timestamp);
+    setState(() {
+      _highlightedId = chapter.id;
+    });
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted) {
+        setState(() {
+          _highlightedId = null;
+        });
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (chapters.isEmpty) {
+    if (widget.chapters.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final sortedChapters = List<ChapterMark>.from(chapters)
+    final sortedChapters = List<ChapterMark>.from(widget.chapters)
       ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
     return Column(
@@ -33,49 +54,55 @@ class VideoChapterList extends StatelessWidget {
       children: [
         // Header with expand/collapse
         GestureDetector(
-          onTap: onToggleExpanded,
+          onTap: widget.onToggleExpanded,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
-                const Icon(Icons.bookmark, size: 16),
+                const Icon(Icons.bookmark, size: 16, color: Colors.white70),
                 const SizedBox(width: 8),
                 Text(
-                  'Chapters (${chapters.length})',
-                  style: Theme.of(context).textTheme.titleSmall,
+                  'Chapters (${widget.chapters.length})',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                  ),
                 ),
                 const Spacer(),
-                Icon(isExpanded ? Icons.expand_less : Icons.expand_more),
+                Icon(
+                  widget.isExpanded ? Icons.expand_less : Icons.expand_more,
+                  color: Colors.white70,
+                ),
               ],
             ),
           ),
         ),
         
         // Chapter list
-        if (isExpanded)
+        if (widget.isExpanded)
           Flexible(
             child: SingleChildScrollView(
               child: Column(
                 children: sortedChapters.map((chapter) {
-                  final isActive = currentPosition >= chapter.timestamp;
+                  final isHighlighted = _highlightedId == chapter.id;
                   return InkWell(
-                    onTap: () => onSeek(chapter.timestamp),
+                    onTap: () => _handleChapterTap(chapter),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      color: isActive ? Colors.grey.withOpacity(0.2) : null,
+                      color: isHighlighted ? Colors.white.withOpacity(0.1) : null,
                       child: Row(
                         children: [
-                          // Chapter marker and line
+                          // Chapter marker
                           SizedBox(
                             width: 24,
                             child: Column(
                               children: [
                                 Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: const BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: isActive ? Colors.blue : Colors.grey,
+                                    color: Colors.white38,
                                   ),
                                 ),
                               ],
@@ -89,14 +116,18 @@ class VideoChapterList extends StatelessWidget {
                               children: [
                                 Text(
                                   chapter.title,
-                                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                    fontWeight: isActive ? FontWeight.bold : null,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
                                   ),
                                 ),
                                 if (chapter.description?.isNotEmpty == true)
                                   Text(
                                     chapter.description!,
-                                    style: Theme.of(context).textTheme.bodySmall,
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -106,8 +137,9 @@ class VideoChapterList extends StatelessWidget {
                           // Timestamp
                           Text(
                             _formatTimestamp(chapter.timestamp),
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: isActive ? Colors.blue : Colors.grey,
+                            style: const TextStyle(
+                              color: Colors.white38,
+                              fontSize: 12,
                             ),
                           ),
                         ],

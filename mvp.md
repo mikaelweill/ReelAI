@@ -72,40 +72,79 @@
    - Timeline scrubber (Studio only)
      - Basic slider functionality ✓
      - Current/total time display ✓
-     - Marker positions for chapters (In Progress)
-       - Visual markers on timeline
-       - Chapter titles on hover/scrub
+     - Marker positions for chapters ✓
+       - Visual markers on timeline ✓
+       - Chapter titles on hover/scrub ✓
      - Smooth seeking behavior ✓
      - Visual feedback during scrubbing ✓
-   - Text overlay editor (Deprioritized)
-     - Basic text input dialog ✓
-     - Text rendering on video (Buggy)
-     - Time-based visibility (Not Working)
-     - Custom duration control (Not Started)
-     - Style presets (Not Started)
-   - Chapter marker interface (High Priority)
+   - Captions/Subtitles Editor (Not Started)
+     - Basic text input dialog
+     - Timed text overlays on video
+     - Custom duration control
+     - Style presets
+     - Position control
+   - Chapter marker interface (High Priority) ✓
      - Add markers in Studio ✓
-     - Delete markers in Studio (NEW)
+     - Delete markers in Studio ✓
      - Title and descriptions ✓
      - Quick navigation in Studio ✓
      - Feed view integration:
        - Chronological chapter list below video ✓
        - Click to seek functionality ✓
        - Maintain normal auto-play behavior ✓
+       - Collapsed by default ✓
      - Chapter visualization on timeline ✓
-     - Scrollable chapter list in feed (NEW)
+     - Scrollable chapter list in feed ✓
    - Studio view improvements:
      - Chronological ordering of chapter list ✓
-     - Delete functionality for chapters (NEW)
+     - Delete functionality for chapters ✓
      - Visual markers on timeline scrubber ✓
      - Chapter titles near markers when scrubbing ✓
 
-3. Enhancement Features (Next)
-   - Text overlay animations
-   - Custom fonts and styles
-   - Chapter preview thumbnails
-   - Sound adjustment controls
-   - Export with enhancements
+### Captions/Subtitles System Implementation (Current Priority)
+1. Data Model Extension
+   - Extend video_edits schema to include captions array:
+     ```typescript
+     captions: [{
+       id: string,          // UUID
+       text: string,        // Caption text
+       startTime: number,   // Start time in seconds
+       duration: number,    // Duration in seconds
+       style?: {           // Optional, for Phase 2
+         color?: string,
+         size?: number
+       }
+     }]
+     ```
+
+2. Basic Implementation (Phase 1)
+   - Reuse existing timeline click handling from chapters
+   - Add caption entry dialog:
+     - Text input field
+     - Duration input field (with video end validation)
+   - Basic caption rendering in video player
+   - Caption toggle button
+   - Simple caption display styling
+
+3. Enhanced Features (Phase 2)
+   - Basic text styling options
+   - Caption position control
+   - Duration adjustment after creation
+   - Caption list view in editor
+   - Edit/Delete functionality
+
+4. Advanced Features (Phase 3)
+   - Multiple caption tracks
+   - Import/Export support
+   - Caption search
+   - Style presets
+   - Batch operations
+
+5. Technical Considerations
+   - Efficient caption storage/retrieval
+   - Smooth rendering performance
+   - Mobile-friendly caption UI
+   - Accessibility compliance
 
 ### Next Steps:
 1. Studio View:
@@ -118,11 +157,11 @@
    - Maintain smooth transitions
 
 3. Future Improvements (Post Chapters)
-   - Fix text overlay rendering and visibility
-   - Add custom duration for text overlays
+   - Implement captions/subtitles system
+   - Add custom duration for captions
    - Implement thumbnail generation
-   - Implement overlay drag-and-drop
-   - Add style presets for text
+   - Implement caption drag-and-drop
+   - Add style presets for captions
 
 4. Feed View (Current) ✓
    - Keep minimal interface ✓

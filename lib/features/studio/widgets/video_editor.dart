@@ -43,6 +43,7 @@ class _VideoEditorState extends State<VideoEditor> {
       videoId: widget.video.id,
       textOverlays: [],
       chapters: [],
+      captions: [],
       lastModified: DateTime.now(),
     );
     // Then load any existing edits
@@ -86,6 +87,7 @@ class _VideoEditorState extends State<VideoEditor> {
             videoId: widget.video.id,
             textOverlays: [],
             chapters: [],
+            captions: [],
             lastModified: DateTime.now(),
           );
         });
@@ -98,6 +100,7 @@ class _VideoEditorState extends State<VideoEditor> {
           videoId: widget.video.id,
           textOverlays: [],
           chapters: [],
+          captions: [],
           lastModified: DateTime.now(),
         );
       });
@@ -132,6 +135,7 @@ class _VideoEditorState extends State<VideoEditor> {
         videoId: widget.video.id, // Ensure we use the widget's video ID
         textOverlays: _videoEdit!.textOverlays,
         chapters: _videoEdit!.chapters,
+        captions: _videoEdit!.captions,
         lastModified: DateTime.now(),
       );
 
