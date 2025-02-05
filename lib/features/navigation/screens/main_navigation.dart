@@ -134,8 +134,8 @@ class _MainNavigationState extends State<MainNavigation> {
             label: 'Feed',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.add_circle_outline, size: 40),
-            label: '',
+            icon: Icon(Icons.add_box_outlined),
+            label: 'Create',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.edit),
@@ -148,7 +148,7 @@ class _MainNavigationState extends State<MainNavigation> {
         ],
         currentIndex: _selectedIndex == 1 ? 0 : _selectedIndex,
         selectedItemColor: Colors.white,
-        unselectedItemColor: Colors.grey,
+        unselectedItemColor: Colors.white54,
         backgroundColor: Colors.black,
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,

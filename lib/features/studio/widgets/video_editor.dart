@@ -26,6 +26,8 @@ class _VideoEditorState extends State<VideoEditor> {
   bool _isPlaying = false;
   double _currentPosition = 0.0;
   final _uuid = const Uuid();
+  bool _isChapterListExpanded = false;
+  bool _isTextOverlayListExpanded = false;
 
   @override
   void initState() {
@@ -525,108 +527,148 @@ class _VideoEditorState extends State<VideoEditor> {
                     ],
                   ),
                 ),
-                if (_videoEdit != null && _videoEdit!.chapters.isNotEmpty)
+                if (_videoEdit != null && (_videoEdit!.chapters.isNotEmpty || _videoEdit!.textOverlays.isNotEmpty))
                   Expanded(
                     child: Column(
                       children: [
                         // Chapters section
-                        Expanded(
-                          child: Column(
+                        if (_videoEdit!.chapters.isNotEmpty)
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Padding(
-                                padding: EdgeInsets.all(8.0),
-                                child: Text(
-                                  'Chapters',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                              // Chapter header with expand/collapse
+                              GestureDetector(
+                                onTap: () => setState(() {
+                                  _isChapterListExpanded = !_isChapterListExpanded;
+                                }),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.bookmark, size: 16, color: Colors.white70),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Chapters (${_videoEdit!.chapters.length})',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      Icon(
+                                        _isChapterListExpanded ? Icons.expand_less : Icons.expand_more,
+                                        color: Colors.white70,
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
-                              Expanded(
-                                child: ListView.builder(
-                                  itemCount: _videoEdit!.chapters.length,
-                                  itemBuilder: (context, index) {
-                                    final sortedChapters = _videoEdit!.chapters.toList()
-                                      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
-                                    
-                                    _videoEdit!.chapters.clear();
-                                    _videoEdit!.chapters.addAll(sortedChapters);
-                                    
-                                    final chapter = _videoEdit!.chapters[index];
-                                    
-                                    return ListTile(
-                                      leading: const Icon(Icons.bookmark),
-                                      title: Text(chapter.title),
-                                      subtitle: Text(
-                                        '${chapter.timestamp.toStringAsFixed(1)}s' +
-                                            (chapter.description != null
-                                                ? ' - ${chapter.description}'
-                                                : ''),
-                                      ),
-                                      trailing: IconButton(
-                                        icon: const Icon(Icons.delete, color: Colors.red),
-                                        onPressed: () {
-                                          showDialog(
-                                            context: context,
-                                            builder: (context) => AlertDialog(
-                                              title: const Text('Delete Chapter?'),
-                                              content: Text('Are you sure you want to delete "${chapter.title}"?'),
-                                              actions: [
-                                                TextButton(
-                                                  onPressed: () => Navigator.pop(context),
-                                                  child: const Text('Cancel'),
-                                                ),
-                                                TextButton(
-                                                  onPressed: () {
-                                                    setState(() {
-                                                      _videoEdit!.chapters.remove(chapter);
-                                                    });
-                                                    _saveVideoEdit();
-                                                    Navigator.pop(context);
-                                                  },
-                                                  child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                                                ),
-                                              ],
+                              // Chapter list (collapsible)
+                              if (_isChapterListExpanded)
+                                SizedBox(
+                                  height: 200, // Fixed height for the list
+                                  child: ListView.builder(
+                                    itemCount: _videoEdit!.chapters.length,
+                                    itemBuilder: (context, index) {
+                                      final sortedChapters = _videoEdit!.chapters.toList()
+                                        ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+                                      
+                                      _videoEdit!.chapters.clear();
+                                      _videoEdit!.chapters.addAll(sortedChapters);
+                                      
+                                      final chapter = _videoEdit!.chapters[index];
+                                      
+                                      return ListTile(
+                                        leading: const Icon(Icons.bookmark),
+                                        title: Text(chapter.title),
+                                        subtitle: Text(
+                                          '${chapter.timestamp.toStringAsFixed(1)}s' +
+                                              (chapter.description != null
+                                                  ? ' - ${chapter.description}'
+                                                  : ''),
+                                        ),
+                                        trailing: IconButton(
+                                          icon: const Icon(Icons.delete, color: Colors.red),
+                                          onPressed: () {
+                                            showDialog(
+                                              context: context,
+                                              builder: (context) => AlertDialog(
+                                                title: const Text('Delete Chapter?'),
+                                                content: Text('Are you sure you want to delete "${chapter.title}"?'),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () => Navigator.pop(context),
+                                                    child: const Text('Cancel'),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed: () {
+                                                      setState(() {
+                                                        _videoEdit!.chapters.remove(chapter);
+                                                      });
+                                                      _saveVideoEdit();
+                                                      Navigator.pop(context);
+                                                    },
+                                                    child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                        onTap: () {
+                                          _controller.seekTo(
+                                            Duration(
+                                              milliseconds: (chapter.timestamp * 1000).round(),
                                             ),
                                           );
                                         },
-                                      ),
-                                      onTap: () {
-                                        _controller.seekTo(
-                                          Duration(
-                                            milliseconds: (chapter.timestamp * 1000).round(),
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  },
+                                      );
+                                    },
+                                  ),
                                 ),
-                              ),
                             ],
                           ),
-                        ),
                         
                         // Text Overlays section
                         if (_videoEdit!.textOverlays.isNotEmpty)
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Padding(
-                                  padding: EdgeInsets.all(8.0),
-                                  child: Text(
-                                    'Text Overlays',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                    ),
+                          Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Text overlay header with expand/collapse
+                              GestureDetector(
+                                onTap: () => setState(() {
+                                  _isTextOverlayListExpanded = !_isTextOverlayListExpanded;
+                                }),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.text_fields, size: 16, color: Colors.white70),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Text Overlays (${_videoEdit!.textOverlays.length})',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      Icon(
+                                        _isTextOverlayListExpanded ? Icons.expand_less : Icons.expand_more,
+                                        color: Colors.white70,
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                Expanded(
+                              ),
+                              // Text overlay list (collapsible)
+                              if (_isTextOverlayListExpanded)
+                                SizedBox(
+                                  height: 200, // Fixed height for the list
                                   child: ListView.builder(
                                     itemCount: _videoEdit!.textOverlays.length,
                                     itemBuilder: (context, index) {
@@ -696,8 +738,7 @@ class _VideoEditorState extends State<VideoEditor> {
                                     },
                                   ),
                                 ),
-                              ],
-                            ),
+                            ],
                           ),
                       ],
                     ),
