@@ -59,8 +59,7 @@ class _VideoCardState extends State<VideoCard> {
       if (mounted && videoEdit?.chapters.isNotEmpty == true) {
         setState(() {
           _videoEdit = videoEdit;
-          // Auto-expand if we have chapters
-          _isChapterListExpanded = true;
+          // Removed auto-expand logic
         });
       }
     });
