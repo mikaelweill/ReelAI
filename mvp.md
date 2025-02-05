@@ -69,111 +69,71 @@
 2. Video Editor UI (In Progress)
    - Video preview player ✓
    - Basic playback controls ✓
-   - Timeline scrubber (Studio only)
+   - Timeline scrubber (Studio only) ✓
      - Basic slider functionality ✓
      - Current/total time display ✓
      - Marker positions for chapters ✓
-       - Visual markers on timeline ✓
-       - Chapter titles on hover/scrub ✓
+     - Visual markers on timeline ✓
+     - Chapter titles on hover/scrub ✓
      - Smooth seeking behavior ✓
      - Visual feedback during scrubbing ✓
-   - Captions/Subtitles Editor (Not Started)
-     - Basic text input dialog
-     - Timed text overlays on video
-     - Custom duration control
-     - Style presets
-     - Position control
-   - Chapter marker interface (High Priority) ✓
+   - Text Overlay System (In Progress)
+     - Basic text input dialog ✓
+     - Timed text overlays on video ✓
+     - Custom duration control ✓
+     - Centered text positioning ✓
+     - Text shadow for readability ✓
+     - Delete functionality ✓
+     - Missing Features:
+       - Edit functionality
+       - Style presets
+       - Position control
+       - Preview in feed/my videos
+   - Chapter marker interface ✓
      - Add markers in Studio ✓
      - Delete markers in Studio ✓
      - Title and descriptions ✓
      - Quick navigation in Studio ✓
-     - Feed view integration:
-       - Chronological chapter list below video ✓
-       - Click to seek functionality ✓
-       - Maintain normal auto-play behavior ✓
-       - Collapsed by default ✓
+     - Feed view integration ✓
      - Chapter visualization on timeline ✓
      - Scrollable chapter list in feed ✓
-   - Studio view improvements:
-     - Chronological ordering of chapter list ✓
-     - Delete functionality for chapters ✓
-     - Visual markers on timeline scrubber ✓
-     - Chapter titles near markers when scrubbing ✓
+     - Chronological ordering ✓
 
-### Captions/Subtitles System Implementation (Current Priority)
-1. Data Model Extension
-   - Extend video_edits schema to include captions array:
-     ```typescript
-     captions: [{
-       id: string,          // UUID
-       text: string,        // Caption text
-       startTime: number,   // Start time in seconds
-       duration: number,    // Duration in seconds
-       style?: {           // Optional, for Phase 2
-         color?: string,
-         size?: number
-       }
-     }]
-     ```
+### Immediate Next Steps (Prioritized):
+1. Text Overlay System
+   - Add edit functionality for existing overlays
+   - Implement text overlay preview in feed/my videos
+   - Add style presets (optional)
+   - Add position control (optional)
 
-2. Basic Implementation (Phase 1)
-   - Reuse existing timeline click handling from chapters
-   - Add caption entry dialog:
-     - Text input field
-     - Duration input field (with video end validation)
-   - Basic caption rendering in video player
-   - Caption toggle button
-   - Simple caption display styling
+2. Video Quality & Performance
+   - Generate and upload thumbnails
+   - Optimize initial load time
+   - Add loading placeholders
+   - Adjust resolution settings
+   - Optimize file size
 
-3. Enhanced Features (Phase 2)
-   - Basic text styling options
-   - Caption position control
-   - Duration adjustment after creation
-   - Caption list view in editor
-   - Edit/Delete functionality
-
-4. Advanced Features (Phase 3)
-   - Multiple caption tracks
-   - Import/Export support
-   - Caption search
-   - Style presets
-   - Batch operations
-
-5. Technical Considerations
-   - Efficient caption storage/retrieval
-   - Smooth rendering performance
-   - Mobile-friendly caption UI
-   - Accessibility compliance
-
-### Next Steps:
-1. Studio View:
-   - Add delete functionality for chapters (Next)
-   - Ensure smooth visual feedback after deletion
-
-2. Feed View:
-   - Make chapter list scrollable
+3. Feed View Improvements
+   - Ensure smooth transitions
    - Handle overflow properly
-   - Maintain smooth transitions
+   - Optimize performance
 
-3. Future Improvements (Post Chapters)
-   - Implement captions/subtitles system
-   - Add custom duration for captions
-   - Implement thumbnail generation
-   - Implement caption drag-and-drop
-   - Add style presets for captions
-
-4. Feed View (Current) ✓
-   - Keep minimal interface ✓
-   - Simple chapter/timestamp buttons ✓
-   - No scrubbing functionality ✓
-   - Focus on content consumption ✓
-
-5. Future Considerations
-   - Detail view implementation (Deprioritized)
+### Future Considerations (Post-MVP)
+1. Advanced Features
+   - Multiple text tracks
+   - Import/Export support
+   - Text search
+   - Batch operations
+   - Detail view implementation
    - Advanced playback controls
    - Enhanced navigation
-   - Additional player features
+
+2. Video Streaming Implementation
+   - Set up video transcoding pipeline
+   - Generate multiple quality variants
+   - Create HLS/DASH segments
+   - Implement CDN integration
+   - Smart caching strategy
 
 ### Video Quality (Next Priority)
    - Generate and upload thumbnails

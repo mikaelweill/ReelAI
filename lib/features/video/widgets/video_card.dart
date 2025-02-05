@@ -30,6 +30,7 @@ class _VideoCardState extends State<VideoCard> {
   bool _isVisible = false;
   bool _isChapterListExpanded = false;
   VideoEdit? _videoEdit;
+  double _currentPosition = 0.0;
 
   @override
   void initState() {
@@ -48,9 +49,10 @@ class _VideoCardState extends State<VideoCard> {
   }
 
   void _videoListener() {
-    // Trigger rebuild when video position changes (for chapter highlighting)
-    if (mounted && _videoEdit?.chapters.isNotEmpty == true) {
-      setState(() {});
+    if (mounted) {
+      setState(() {
+        _currentPosition = widget.controller.value.position.inMilliseconds / 1000;
+      });
     }
   }
 
@@ -236,6 +238,37 @@ class _VideoCardState extends State<VideoCard> {
                           ),
                         ),
                       VideoPlayer(widget.controller),
+                      if (_videoEdit != null)
+                        ..._videoEdit!.textOverlays
+                            .where((overlay) =>
+                                overlay.startTime <= _currentPosition &&
+                                overlay.endTime >= _currentPosition)
+                            .map(
+                              (overlay) => Positioned(
+                                left: 0,
+                                right: 0,
+                                bottom: 50, // Add some padding from bottom
+                                child: Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                                    child: Text(
+                                      overlay.text,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 24,
+                                        shadows: [
+                                          Shadow(
+                                            blurRadius: 4,
+                                            color: Colors.black,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                     ],
                   ),
                 ),
