@@ -30,15 +30,64 @@
 
 ## Phase 3: Core Features (In Progress)
 
-### Current Priority: Video Playback Optimization
-1. Memory & Performance (In Progress) ✓
+### Video Playback Implementation ✓
+1. Full-Screen Experience ✓
+   - Vertical scroll pagination ✓
+   - Proper aspect ratio handling ✓
+   - Black letterboxing for different ratios ✓
+   - Centered video display ✓
+   - Tap to play/pause ✓
+
+2. Memory & Performance ✓
    - Limit active video controllers ✓
    - Release resources for off-screen videos ✓
    - Add buffering indicators ✓
    - Progressive loading implementation ✓
    - Better error handling for video playback ✓
 
-2. Video Quality (Next Priority)
+3. UI/UX Improvements ✓
+   - Text shadows for readability ✓
+   - Semi-transparent control buttons ✓
+   - Proper safe area handling ✓
+   - Improved video metadata display ✓
+   - Privacy controls with visual feedback ✓
+
+### Current Priority: Social Features
+1. Video Interactions
+   - Double-tap to like
+   - Like counter
+   - Share functionality
+   - Comment system
+   - View tracking
+
+2. User Engagement
+   - User profiles
+   - Following system
+   - Activity feed
+   - Notifications
+
+3. Content Discovery
+   - For You page
+   - Following feed
+   - Search functionality
+   - Hashtags system
+
+### Next Steps:
+1. Performance Optimization
+   - Smart preloading of adjacent videos
+   - Better memory management
+   - Efficient cache handling
+   - Network optimization
+   - Video compression
+
+2. Advanced Features
+   - Background audio support
+   - Video filters
+   - Custom thumbnails
+   - Video trimming
+   - Music library
+
+### Video Quality (Next Priority)
    - Generate and upload thumbnails
    - Optimize initial load time
    - Add loading placeholders
@@ -53,26 +102,6 @@
    - Mute/unmute toggle (Next)
    - Double-tap to like (Next)
    - Share button (Next)
-
-### Next Steps (Prioritized):
-1. Essential UI/UX Improvements
-   - Pull-to-refresh in feeds
-   - Infinite scroll pagination
-   - Enhanced video card design
-   - Loading state animations
-   - Error state handling
-
-2. Basic Social Features
-   - Simple like system
-   - View count tracking
-   - Basic user profiles
-   - Following system
-
-3. Performance Optimization
-   - Smart preloading of adjacent videos
-   - Better memory management
-   - Efficient cache handling
-   - Network optimization
 
 ### Video Streaming Implementation
 1. Backend Processing
@@ -122,6 +151,50 @@ videos/{videoId} ✓
     fallback: string   // Direct video URL fallback
   },
   qualities: string[], // Available quality variants
+}
+```
+
+#### Video Enhancements Collection (NEW)
+```typescript
+video_enhancements/{videoId} {
+  subtitles: [{
+    id: string,          // Unique identifier
+    startTime: number,   // Start time in seconds
+    endTime: number,     // End time in seconds
+    text: string,        // Subtitle text
+    style: {             // Text styling
+      color: string,     // Text color
+      size: number,      // Font size
+      position: {        // Position on screen
+        x: number,       // 0-1 (percentage from left)
+        y: number        // 0-1 (percentage from top)
+      },
+      background: string?, // Optional background color
+      fontWeight: string  // normal, bold, etc.
+    }
+  }],
+  timestamps: [{
+    id: string,          // Unique identifier
+    time: number,        // Timestamp in seconds
+    title: string,       // Short description
+    description: string?, // Optional longer description
+    thumbnail: string?   // Optional thumbnail for this timestamp
+  }],
+  lastModified: timestamp,
+  version: number        // For handling schema updates
+}
+```
+
+#### User Interactions Collection (NEW)
+```typescript
+video_interactions/{videoId}/interactions/{userId} {
+  timestampClicks: [{    // Track which timestamps users click
+    timestampId: string,
+    clickedAt: timestamp
+  }],
+  viewProgress: number,  // How far user watched (percentage)
+  lastViewedAt: timestamp,
+  completedViews: number // Number of complete views
 }
 ```
 

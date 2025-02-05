@@ -103,7 +103,30 @@ class _VideoCardState extends State<VideoCard> {
             Center(
               child: AspectRatio(
                 aspectRatio: widget.video.aspectRatio,
-                child: VideoPlayer(widget.controller),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Show placeholder if video is not ready
+                    if (!widget.controller.value.isInitialized)
+                      Container(
+                        color: Colors.black87,
+                        child: const Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.video_library, color: Colors.white70, size: 48),
+                              SizedBox(height: 8),
+                              Text(
+                                'Loading Video...',
+                                style: TextStyle(color: Colors.white70),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    VideoPlayer(widget.controller),
+                  ],
+                ),
               ),
             ),
             // Video controls overlay

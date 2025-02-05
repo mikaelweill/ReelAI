@@ -5,6 +5,7 @@ import '../../video/screens/feed_screen.dart';
 import '../../camera/screens/camera_screen.dart';
 import '../../video/screens/upload_screen.dart';
 import '../../auth/services/auth_service.dart';
+import '../../studio/screens/studio_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -99,7 +100,7 @@ class _MainNavigationState extends State<MainNavigation> {
 
   @override
   Widget build(BuildContext context) {
-    final List<String> titles = ['Feed', '', 'My Videos'];
+    final List<String> titles = ['Feed', '', 'Studio', 'My Videos'];
     
     return Scaffold(
       appBar: _selectedIndex != 1 ? AppBar(
@@ -120,9 +121,10 @@ class _MainNavigationState extends State<MainNavigation> {
       body: IndexedStack(
         index: _selectedIndex,
         children: const [
-          FeedScreen(),  // Public videos feed
-          SizedBox(),    // Placeholder for camera
-          HomeScreen(),  // My videos (private + public)
+          FeedScreen(),      // Public videos feed
+          SizedBox(),        // Placeholder for camera
+          StudioScreen(),    // New Studio screen
+          HomeScreen(),      // My videos (private + public)
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -136,11 +138,15 @@ class _MainNavigationState extends State<MainNavigation> {
             label: '',
           ),
           BottomNavigationBarItem(
+            icon: Icon(Icons.edit),
+            label: 'Studio',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.person),
             label: 'My Videos',
           ),
         ],
-        currentIndex: _selectedIndex == 1 ? 0 : _selectedIndex,  // Never show camera as selected
+        currentIndex: _selectedIndex == 1 ? 0 : _selectedIndex,
         selectedItemColor: Colors.white,
         unselectedItemColor: Colors.grey,
         backgroundColor: Colors.black,
