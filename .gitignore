@@ -12,6 +12,17 @@
 .swiftpm/
 migrate_working_dir/
 
+# Additional binary files to ignore
+**/web/icons/
+**/web/favicon.png
+**/macos/Runner/Assets.xcassets/
+**/functions/venv/
+
+# Keep essential app icons
+!**/android/app/src/main/res/mipmap-*/ic_launcher.png
+!**/ios/Runner/Assets.xcassets/AppIcon.appiconset/
+!**/ios/Runner/Assets.xcassets/LaunchImage.imageset/
+
 # Python/venv
 venv/
 .venv/
@@ -27,10 +38,12 @@ __pycache__/
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# VS Code related
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 
 # Flutter/Dart/Pub related
 **/doc/api/
@@ -44,6 +57,23 @@ __pycache__/
 /build/
 *.lock
 !/pubspec.lock
+*.g.dart
+*.freezed.dart
+*.mocks.dart
+*.gr.dart
+*.config.dart
+
+# FVM (Flutter Version Management)
+.fvm/
+
+# Generated Dart files
+/lib/generated/
+/lib/generated_plugin_registrant.dart
+
+# Environment files
+.env*
+*.env.dart
+env.g.dart
 
 # Symbolication related
 app.*.symbols
@@ -77,6 +107,10 @@ firebase_options.dart
 **/android/gradlew.bat
 **/android/local.properties
 **/android/**/GeneratedPluginRegistrant.java
+**/android/key.properties
+**/android/app/release/
+**/android/app/debug/
+**/android/app/profile/
 
 # iOS
 **/ios/**/*.mode1v3
@@ -110,13 +144,45 @@ firebase_options.dart
 **/macos/Flutter/Flutter-Debug.xcconfig
 **/macos/Flutter/Flutter-Release.xcconfig
 **/macos/Flutter/Flutter-Profile.xcconfig
+**/macos/Pods/
 
-# Coverage
+# Windows
+**/windows/flutter/generated_plugin_registrant.*
+**/windows/flutter/generated_plugins.cmake
+
+# Linux
+**/linux/flutter/generated_plugin_registrant.*
+**/linux/flutter/generated_plugins.cmake
+
+# Web
+**/web/flutter_service_worker.js
+**/web/splash/
+.dart_tool/
+.packages
+build/
+web/assets/
+
+# Test coverage
 coverage/
+.test_coverage.dart
+lcov.info
 
-# Exceptions to above rules.
+# Performance and debugging
+*.jks
+*.keystore
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Exceptions to above rules
 !**/ios/**/default.mode1v3
 !**/ios/**/default.mode2v3
 !**/ios/**/default.pbxuser
 !**/ios/**/default.perspectivev3
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
+
+# Keep these files
+!pubspec.lock
+!ios/Podfile.lock

@@ -25,8 +25,9 @@ class VideoFeed extends StatefulWidget {
 
 class _VideoFeedState extends State<VideoFeed> {
   final Map<String, VideoPlayerController> _controllers = {};
-  static const int _maxControllers = 3;  // Maximum number of active controllers
-  String? _currentlyPlayingUrl;  // Track which video is currently playing
+  static const int _maxControllers = 3;
+  String? _currentlyPlayingUrl;
+  final Map<String, bool> _bufferingStates = {};
 
   @override
   void dispose() {
@@ -41,12 +42,14 @@ class _VideoFeedState extends State<VideoFeed> {
     try {
       final controller = _controllers.remove(videoUrl);
       if (controller != null) {
+        controller.removeListener(() => _onVideoControllerUpdate(videoUrl));
         await controller.pause();
         await controller.dispose();
       }
       if (_currentlyPlayingUrl == videoUrl) {
         _currentlyPlayingUrl = null;
       }
+      _bufferingStates.remove(videoUrl);
     } catch (e) {
       print('Error disposing controller: $e');
     }
@@ -67,8 +70,15 @@ class _VideoFeedState extends State<VideoFeed> {
       print('Initializing video controller for: $videoUrl');
       final controller = VideoPlayerController.networkUrl(
         Uri.parse(videoUrl),
-        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
+        videoPlayerOptions: VideoPlayerOptions(
+          mixWithOthers: false,
+          allowBackgroundPlayback: false,
+        ),
       );
+      
+      // Add buffering listener
+      controller.addListener(() => _onVideoControllerUpdate(videoUrl));
+      _bufferingStates[videoUrl] = true;
       
       try {
         await controller.initialize();
@@ -85,6 +95,49 @@ class _VideoFeedState extends State<VideoFeed> {
       print('Error in _getController: $e');
       return null;
     }
+  }
+
+  void _onVideoControllerUpdate(String videoUrl) {
+    final controller = _controllers[videoUrl];
+    if (controller == null) return;
+
+    final buffered = controller.value.buffered;
+    final isBuffering = buffered.isEmpty || 
+        buffered.first.end < controller.value.position + const Duration(seconds: 1);
+    
+    if (_bufferingStates[videoUrl] != isBuffering && mounted) {
+      setState(() {
+        _bufferingStates[videoUrl] = isBuffering;
+      });
+    }
+  }
+
+  Widget _buildVideoPlaceholder(Video video, bool isBuffering) {
+    return Container(
+      color: Colors.black,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: AspectRatio(
+        aspectRatio: video.aspectRatio,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (video.thumbnailUrl?.isNotEmpty == true)
+              Image.network(
+                video.thumbnailUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const SizedBox(),
+              ),
+            if (isBuffering)
+              Container(
+                color: Colors.black45,
+                child: const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   void onVideoVisibilityChanged(String videoUrl, bool isVisible) async {
@@ -144,48 +197,48 @@ class _VideoFeedState extends State<VideoFeed> {
         return ListView.builder(
           padding: const EdgeInsets.symmetric(vertical: 8),
           itemCount: videos.length,
-          cacheExtent: 0, // Disable caching to better control video loading
+          cacheExtent: 0,
           itemBuilder: (context, index) {
             final video = videos[index];
+            
             return FutureBuilder<VideoPlayerController?>(
               future: _getController(video.videoUrl),
               builder: (context, controllerSnapshot) {
                 if (!controllerSnapshot.hasData || controllerSnapshot.data == null) {
-                  return Container(
-                    color: Colors.black,
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: AspectRatio(
-                      aspectRatio: video.aspectRatio,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          if (video.thumbnailUrl?.isNotEmpty == true)
-                            Image.network(
-                              video.thumbnailUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => const SizedBox(),
-                            ),
-                          const Center(
-                            child: CircularProgressIndicator(color: Colors.white),
-                          ),
-                        ],
-                      ),
-                    ),
+                  return _buildVideoPlaceholder(
+                    video, 
+                    _bufferingStates[video.videoUrl] ?? true
                   );
                 }
 
-                return VideoCard(
-                  video: video,
-                  controller: controllerSnapshot.data!,
-                  onVisibilityChanged: (isVisible) => 
-                      onVideoVisibilityChanged(video.videoUrl, isVisible),
-                  showPrivacyIndicator: widget.showPrivacyControls,
-                  onDelete: widget.allowDeletion 
-                      ? () {
-                          VideoFeedService().deleteVideo(video.id);
-                          widget.onVideoDeleted?.call();
-                        }
-                      : null,
+                return Stack(
+                  children: [
+                    VideoCard(
+                      video: video,
+                      controller: controllerSnapshot.data!,
+                      onVisibilityChanged: (isVisible) => 
+                          onVideoVisibilityChanged(video.videoUrl, isVisible),
+                      showPrivacyIndicator: widget.showPrivacyControls,
+                      onDelete: widget.allowDeletion 
+                          ? () {
+                              VideoFeedService().deleteVideo(video.id);
+                              widget.onVideoDeleted?.call();
+                            }
+                          : null,
+                    ),
+                    if (_bufferingStates[video.videoUrl] ?? false)
+                      Positioned.fill(
+                        child: Container(
+                          color: Colors.black26,
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 );
               },
             );
