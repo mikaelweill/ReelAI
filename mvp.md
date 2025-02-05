@@ -85,14 +85,20 @@
      - Style presets (Not Started)
    - Chapter marker interface (High Priority)
      - Add markers in Studio ✓
-     - Edit/delete markers in Studio (Next)
+     - Delete markers in Studio (NEW)
      - Title and descriptions ✓
      - Quick navigation in Studio ✓
      - Feed view integration:
-       - Chronological chapter list below video
-       - Click to seek functionality
-       - Maintain normal auto-play behavior
-     - Chapter visualization on timeline (Next)
+       - Chronological chapter list below video ✓
+       - Click to seek functionality ✓
+       - Maintain normal auto-play behavior ✓
+     - Chapter visualization on timeline ✓
+     - Scrollable chapter list in feed (NEW)
+   - Studio view improvements:
+     - Chronological ordering of chapter list (NEW)
+     - Delete functionality for chapters (NEW)
+     - Visual markers on timeline scrubber ✓
+     - Chapter titles near markers when scrubbing ✓
 
 3. Enhancement Features (Next)
    - Text overlay animations
@@ -102,33 +108,33 @@
    - Export with enhancements
 
 ### Next Steps:
-1. Immediate Focus (Chapters Implementation)
-   Studio View:
-   - Add visual markers on timeline scrubber
-   - Add chapter titles near markers when scrubbing
-   - Implement edit/delete functionality for chapters
-   - Ensure smooth visual feedback
+1. Studio View:
+   - Add delete functionality for chapters
+   - Implement chronological ordering of chapters
+   - Ensure smooth visual feedback after deletion
 
-   Feed/My Videos View:
+2. Feed View:
    - Add chronological chapter list below video
    - Implement click-to-seek functionality
    - Maintain existing auto-play behavior
-   - Ensure smooth chapter transitions
+   - Make chapter list scrollable
+   - Handle overflow properly
+   - Maintain smooth transitions
 
-2. Future Improvements (Post Chapters)
+3. Future Improvements (Post Chapters)
    - Fix text overlay rendering and visibility
    - Add custom duration for text overlays
    - Implement thumbnail generation
    - Implement overlay drag-and-drop
    - Add style presets for text
 
-3. Feed View (Current) ✓
+4. Feed View (Current) ✓
    - Keep minimal interface ✓
    - Simple chapter/timestamp buttons ✓
    - No scrubbing functionality ✓
    - Focus on content consumption ✓
 
-4. Future Considerations
+5. Future Considerations
    - Detail view implementation (Deprioritized)
    - Advanced playback controls
    - Enhanced navigation

@@ -487,7 +487,12 @@ class _VideoEditorState extends State<VideoEditor> {
                     child: ListView.builder(
                       itemCount: _videoEdit!.chapters.length,
                       itemBuilder: (context, index) {
+                        // Create sorted list once before ListView.builder
+                        final sortedChapters = _videoEdit!.chapters.toList()
+                          ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+                        _videoEdit!.chapters = sortedChapters;  // Update the original list
                         final chapter = _videoEdit!.chapters[index];
+                        
                         return ListTile(
                           leading: const Icon(Icons.bookmark),
                           title: Text(chapter.title),
@@ -500,8 +505,7 @@ class _VideoEditorState extends State<VideoEditor> {
                           onTap: () {
                             _controller.seekTo(
                               Duration(
-                                milliseconds:
-                                    (chapter.timestamp * 1000).round(),
+                                milliseconds: (chapter.timestamp * 1000).round(),
                               ),
                             );
                           },
