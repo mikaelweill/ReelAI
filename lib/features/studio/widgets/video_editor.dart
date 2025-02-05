@@ -183,42 +183,74 @@ class _VideoEditorState extends State<VideoEditor> {
     showDialog(
       context: context,
       builder: (context) {
-        String text = '';
-        return AlertDialog(
-          title: const Text('Add Text Overlay'),
-          content: TextField(
-            onChanged: (value) => text = value,
-            decoration: const InputDecoration(
-              hintText: 'Enter text',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                if (text.isNotEmpty) {
-                  setState(() {
-                    _videoEdit?.textOverlays.add(
-                      TextOverlay(
-                        id: _uuid.v4(),
-                        text: text,
-                        startTime: currentTime,
-                        endTime: currentTime + 3.0, // Default 3 second duration
-                        top: 0.5,
-                        left: 0.5,
-                        style: 'default',
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            String text = '';
+            double duration = 3.0; // Default duration
+            return AlertDialog(
+              title: const Text('Add Text Overlay'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    onChanged: (value) => text = value,
+                    decoration: const InputDecoration(
+                      hintText: 'Enter text',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Text('Duration: '),
+                      Expanded(
+                        child: Slider(
+                          value: duration,
+                          min: 1.0,
+                          max: 10.0,
+                          divisions: 18,
+                          label: '${duration.toStringAsFixed(1)}s',
+                          onChanged: (value) {
+                            setDialogState(() {
+                              duration = value;
+                            });
+                          },
+                        ),
                       ),
-                    );
-                  });
-                }
-                Navigator.pop(context);
-              },
-              child: const Text('Add'),
-            ),
-          ],
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    if (text.isNotEmpty) {
+                      setState(() {
+                        _videoEdit?.textOverlays.add(
+                          TextOverlay(
+                            id: _uuid.v4(),
+                            text: text,
+                            startTime: currentTime,
+                            endTime: currentTime + duration,
+                            top: 0.5,
+                            left: 0.5,
+                            style: 'default',
+                          ),
+                        );
+                      });
+                      Navigator.pop(context);
+                      // Save changes to Firestore
+                      await _saveVideoEdit();
+                    }
+                  },
+                  child: const Text('Add'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -488,66 +520,179 @@ class _VideoEditorState extends State<VideoEditor> {
                 ),
                 if (_videoEdit != null && _videoEdit!.chapters.isNotEmpty)
                   Expanded(
-                    child: ListView.builder(
-                      itemCount: _videoEdit!.chapters.length,
-                      itemBuilder: (context, index) {
-                        // Sort chapters by timestamp before ListView.builder
-                        final sortedChapters = _videoEdit!.chapters.toList()
-                          ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
-                        
-                        // Instead of assignment, clear and addAll
-                        _videoEdit!.chapters.clear();
-                        _videoEdit!.chapters.addAll(sortedChapters);
-                        
-                        final chapter = _videoEdit!.chapters[index];
-                        
-                        return ListTile(
-                          leading: const Icon(Icons.bookmark),
-                          title: Text(chapter.title),
-                          subtitle: Text(
-                            '${chapter.timestamp.toStringAsFixed(1)}s' +
-                                (chapter.description != null
-                                    ? ' - ${chapter.description}'
-                                    : ''),
-                          ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.delete, color: Colors.red),
-                            onPressed: () {
-                              // Show confirmation dialog
-                              showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text('Delete Chapter?'),
-                                  content: Text('Are you sure you want to delete "${chapter.title}"?'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    TextButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          _videoEdit!.chapters.remove(chapter);
-                                        });
-                                        _saveVideoEdit(); // Save changes to Firestore
-                                        Navigator.pop(context);
-                                      },
-                                      child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                                    ),
-                                  ],
+                    child: Column(
+                      children: [
+                        // Chapters section
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Padding(
+                                padding: EdgeInsets.all(8.0),
+                                child: Text(
+                                  'Chapters',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              );
-                            },
-                          ),
-                          onTap: () {
-                            _controller.seekTo(
-                              Duration(
-                                milliseconds: (chapter.timestamp * 1000).round(),
                               ),
-                            );
-                          },
-                        );
-                      },
+                              Expanded(
+                                child: ListView.builder(
+                                  itemCount: _videoEdit!.chapters.length,
+                                  itemBuilder: (context, index) {
+                                    final sortedChapters = _videoEdit!.chapters.toList()
+                                      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+                                    
+                                    _videoEdit!.chapters.clear();
+                                    _videoEdit!.chapters.addAll(sortedChapters);
+                                    
+                                    final chapter = _videoEdit!.chapters[index];
+                                    
+                                    return ListTile(
+                                      leading: const Icon(Icons.bookmark),
+                                      title: Text(chapter.title),
+                                      subtitle: Text(
+                                        '${chapter.timestamp.toStringAsFixed(1)}s' +
+                                            (chapter.description != null
+                                                ? ' - ${chapter.description}'
+                                                : ''),
+                                      ),
+                                      trailing: IconButton(
+                                        icon: const Icon(Icons.delete, color: Colors.red),
+                                        onPressed: () {
+                                          showDialog(
+                                            context: context,
+                                            builder: (context) => AlertDialog(
+                                              title: const Text('Delete Chapter?'),
+                                              content: Text('Are you sure you want to delete "${chapter.title}"?'),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () => Navigator.pop(context),
+                                                  child: const Text('Cancel'),
+                                                ),
+                                                TextButton(
+                                                  onPressed: () {
+                                                    setState(() {
+                                                      _videoEdit!.chapters.remove(chapter);
+                                                    });
+                                                    _saveVideoEdit();
+                                                    Navigator.pop(context);
+                                                  },
+                                                  child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                      onTap: () {
+                                        _controller.seekTo(
+                                          Duration(
+                                            milliseconds: (chapter.timestamp * 1000).round(),
+                                          ),
+                                        );
+                                      },
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        
+                        // Text Overlays section
+                        if (_videoEdit!.textOverlays.isNotEmpty)
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Padding(
+                                  padding: EdgeInsets.all(8.0),
+                                  child: Text(
+                                    'Text Overlays',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: ListView.builder(
+                                    itemCount: _videoEdit!.textOverlays.length,
+                                    itemBuilder: (context, index) {
+                                      final sortedOverlays = _videoEdit!.textOverlays.toList()
+                                        ..sort((a, b) => a.startTime.compareTo(b.startTime));
+                                      
+                                      _videoEdit!.textOverlays.clear();
+                                      _videoEdit!.textOverlays.addAll(sortedOverlays);
+                                      
+                                      final overlay = _videoEdit!.textOverlays[index];
+                                      final isActive = _currentPosition >= overlay.startTime && 
+                                                     _currentPosition <= overlay.endTime;
+                                      
+                                      return ListTile(
+                                        leading: Icon(
+                                          Icons.text_fields,
+                                          color: isActive ? Colors.white : Colors.white38,
+                                        ),
+                                        title: Text(
+                                          overlay.text,
+                                          style: TextStyle(
+                                            color: isActive ? Colors.white : Colors.white70,
+                                          ),
+                                        ),
+                                        subtitle: Text(
+                                          '${overlay.startTime.toStringAsFixed(1)}s - ${overlay.endTime.toStringAsFixed(1)}s',
+                                          style: TextStyle(
+                                            color: isActive ? Colors.white70 : Colors.white38,
+                                          ),
+                                        ),
+                                        trailing: IconButton(
+                                          icon: const Icon(Icons.delete, color: Colors.red),
+                                          onPressed: () {
+                                            showDialog(
+                                              context: context,
+                                              builder: (context) => AlertDialog(
+                                                title: const Text('Delete Text Overlay?'),
+                                                content: Text('Are you sure you want to delete "${overlay.text}"?'),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () => Navigator.pop(context),
+                                                    child: const Text('Cancel'),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed: () {
+                                                      setState(() {
+                                                        _videoEdit!.textOverlays.remove(overlay);
+                                                      });
+                                                      _saveVideoEdit();
+                                                      Navigator.pop(context);
+                                                    },
+                                                    child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                        onTap: () {
+                                          _controller.seekTo(
+                                            Duration(
+                                              milliseconds: (overlay.startTime * 1000).round(),
+                                            ),
+                                          );
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
                     ),
                   ),
               ],
