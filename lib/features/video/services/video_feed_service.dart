@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../studio/models/video_edit.dart';
 
 class Video {
   final String id;
@@ -114,5 +115,27 @@ class VideoFeedService {
         'isPrivate': isPrivate,
       });
     }
+  }
+
+  // Get video edits for a specific video
+  Stream<VideoEdit?> getVideoEdits(String videoId) {
+    return _firestore
+        .collection('video_edits')
+        .doc(videoId)
+        .snapshots()
+        .map((doc) => doc.exists ? VideoEdit.fromJson(doc.data()!) : null);
+  }
+
+  // Get video with its edits combined
+  Stream<(Video, VideoEdit?)?> getVideoWithEdits(String videoId) {
+    return _firestore.collection('videos').doc(videoId).snapshots().asyncMap((videoDoc) async {
+      if (!videoDoc.exists) return null;
+      
+      final video = Video.fromFirestore(videoDoc);
+      final editDoc = await _firestore.collection('video_edits').doc(videoId).get();
+      final edit = editDoc.exists ? VideoEdit.fromJson(editDoc.data()!) : null;
+      
+      return (video, edit);
+    });
   }
 } 

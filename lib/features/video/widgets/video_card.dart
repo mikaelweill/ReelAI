@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:visibility_detector/visibility_detector.dart';
 import '../services/video_feed_service.dart';
+import '../../studio/models/video_edit.dart';
+import 'video_chapter_list.dart';
 
 class VideoCard extends StatefulWidget {
   final Video video;
@@ -26,13 +28,42 @@ class VideoCard extends StatefulWidget {
 class _VideoCardState extends State<VideoCard> {
   final VideoFeedService _feedService = VideoFeedService();
   bool _isVisible = false;
+  bool _isChapterListExpanded = false;
+  VideoEdit? _videoEdit;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVideoEdit();
+    widget.controller.addListener(_videoListener);
+  }
 
   @override
   void dispose() {
+    widget.controller.removeListener(_videoListener);
     if (_isVisible) {
       widget.controller.pause();
     }
     super.dispose();
+  }
+
+  void _videoListener() {
+    // Trigger rebuild when video position changes (for chapter highlighting)
+    if (mounted && _videoEdit?.chapters.isNotEmpty == true) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _loadVideoEdit() async {
+    _feedService.getVideoEdits(widget.video.id).listen((videoEdit) {
+      if (mounted && videoEdit?.chapters.isNotEmpty == true) {
+        setState(() {
+          _videoEdit = videoEdit;
+          // Auto-expand if we have chapters
+          _isChapterListExpanded = true;
+        });
+      }
+    });
   }
 
   String _formatDate(DateTime date) {
@@ -97,153 +128,150 @@ class _VideoCardState extends State<VideoCard> {
       },
       child: Container(
         color: Colors.black,
-        child: Stack(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Center the video with correct aspect ratio
-            Center(
-              child: AspectRatio(
-                aspectRatio: widget.video.aspectRatio,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Show placeholder if video is not ready
-                    if (!widget.controller.value.isInitialized)
-                      Container(
-                        color: Colors.black87,
-                        child: const Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.video_library, color: Colors.white70, size: 48),
-                              SizedBox(height: 8),
-                              Text(
-                                'Loading Video...',
-                                style: TextStyle(color: Colors.white70),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    VideoPlayer(widget.controller),
-                  ],
-                ),
-              ),
-            ),
-            // Video controls overlay
-            GestureDetector(
-              onTap: () {
-                if (widget.controller.value.isPlaying) {
-                  widget.controller.pause();
-                } else {
-                  widget.controller.play();
-                }
-              },
-              child: Container(
-                color: Colors.transparent,
-              ),
-            ),
-            // Video info overlay
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: MediaQuery.of(context).padding.bottom + 16,
+            // Title and description section
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    widget.video.title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      shadows: [
-                        Shadow(
-                          offset: Offset(1.0, 1.0),
-                          blurRadius: 3.0,
-                          color: Color.fromARGB(255, 0, 0, 0),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.video.title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      if (widget.showPrivacyIndicator)
+                        GestureDetector(
+                          onTap: _showPrivacyConfirmation,
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.black45,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Icon(
+                              widget.video.isPrivate ? Icons.lock : Icons.public,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                      if (widget.onDelete != null) ...[
+                        const SizedBox(width: 16),
+                        GestureDetector(
+                          onTap: widget.onDelete,
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.black45,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Icon(
+                              Icons.delete,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
                         ),
                       ],
-                    ),
+                    ],
                   ),
                   if (widget.video.description?.isNotEmpty == true) ...[
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     Text(
                       widget.video.description!,
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 14,
-                        shadows: [
-                          Shadow(
-                            offset: Offset(1.0, 1.0),
-                            blurRadius: 3.0,
-                            color: Color.fromARGB(255, 0, 0, 0),
-                          ),
-                        ],
                       ),
                     ),
                   ],
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Created: ${_formatDate(widget.video.createdAt)}',
-                        style: const TextStyle(
-                          color: Colors.white60,
-                          fontSize: 12,
-                          shadows: [
-                            Shadow(
-                              offset: Offset(1.0, 1.0),
-                              blurRadius: 3.0,
-                              color: Color.fromARGB(255, 0, 0, 0),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (widget.showPrivacyIndicator || widget.onDelete != null)
-                        Row(
-                          children: [
-                            if (widget.showPrivacyIndicator)
-                              GestureDetector(
-                                onTap: _showPrivacyConfirmation,
-                                child: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black45,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Icon(
-                                    widget.video.isPrivate ? Icons.lock : Icons.public,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                ),
-                              ),
-                            if (widget.onDelete != null) ...[
-                              const SizedBox(width: 16),
-                              GestureDetector(
-                                onTap: widget.onDelete,
-                                child: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black45,
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: const Icon(
-                                    Icons.delete,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                    ],
+                  const SizedBox(height: 4),
+                  Text(
+                    'Created: ${_formatDate(widget.video.createdAt)}',
+                    style: const TextStyle(
+                      color: Colors.white60,
+                      fontSize: 12,
+                    ),
                   ),
                 ],
               ),
             ),
+
+            // Video section
+            Stack(
+              children: [
+                Center(
+                  child: AspectRatio(
+                    aspectRatio: widget.video.aspectRatio,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (!widget.controller.value.isInitialized)
+                          Container(
+                            color: Colors.black87,
+                            child: const Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.video_library, color: Colors.white70, size: 48),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    'Loading Video...',
+                                    style: TextStyle(color: Colors.white70),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        VideoPlayer(widget.controller),
+                      ],
+                    ),
+                  ),
+                ),
+                // Video tap control
+                Positioned.fill(
+                  child: GestureDetector(
+                    onTap: () {
+                      if (widget.controller.value.isPlaying) {
+                        widget.controller.pause();
+                      } else {
+                        widget.controller.play();
+                      }
+                    },
+                    child: Container(
+                      color: Colors.transparent,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            // Chapter list
+            if (_videoEdit?.chapters.isNotEmpty == true)
+              VideoChapterList(
+                chapters: _videoEdit!.chapters,
+                currentPosition: widget.controller.value.position.inMilliseconds / 1000,
+                onSeek: (timestamp) {
+                  widget.controller.seekTo(Duration(milliseconds: (timestamp * 1000).round()));
+                },
+                isExpanded: _isChapterListExpanded,
+                onToggleExpanded: () {
+                  setState(() {
+                    _isChapterListExpanded = !_isChapterListExpanded;
+                  });
+                },
+              ),
           ],
         ),
       ),
