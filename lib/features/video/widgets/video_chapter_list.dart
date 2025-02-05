@@ -7,7 +7,7 @@ class VideoChapterList extends StatelessWidget {
   final Function(double) onSeek;
   final bool isEditable;
   final bool isExpanded;
-  final VoidCallback? onToggleExpanded;
+  final VoidCallback onToggleExpanded;
   
   const VideoChapterList({
     super.key,
@@ -15,8 +15,8 @@ class VideoChapterList extends StatelessWidget {
     required this.currentPosition,
     required this.onSeek,
     this.isEditable = false,
-    this.isExpanded = true,
-    this.onToggleExpanded,
+    this.isExpanded = false,
+    required this.onToggleExpanded,
   });
 
   @override
@@ -32,116 +32,91 @@ class VideoChapterList extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         // Header with expand/collapse
-        if (onToggleExpanded != null)
-          InkWell(
-            onTap: onToggleExpanded,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  const Icon(Icons.bookmark, size: 16),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Chapters (${chapters.length})',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                  const Spacer(),
-                  Icon(isExpanded ? Icons.expand_less : Icons.expand_more),
-                ],
-              ),
+        GestureDetector(
+          onTap: onToggleExpanded,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                const Icon(Icons.bookmark, size: 16),
+                const SizedBox(width: 8),
+                Text(
+                  'Chapters (${chapters.length})',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const Spacer(),
+                Icon(isExpanded ? Icons.expand_less : Icons.expand_more),
+              ],
             ),
           ),
+        ),
         
         // Chapter list
         if (isExpanded)
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: sortedChapters.length,
-            itemBuilder: (context, index) {
-              final chapter = sortedChapters[index];
-              final isActive = currentPosition >= chapter.timestamp &&
-                  (index == sortedChapters.length - 1 ||
-                      currentPosition < sortedChapters[index + 1].timestamp);
-
-              return InkWell(
-                onTap: () => onSeek(chapter.timestamp),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  color: isActive ? Colors.grey.withOpacity(0.2) : null,
-                  child: Row(
-                    children: [
-                      // Chapter marker and line
-                      SizedBox(
-                        width: 24,
-                        child: Column(
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: isActive ? Colors.blue : Colors.grey,
-                              ),
+          Flexible(
+            child: SingleChildScrollView(
+              child: Column(
+                children: sortedChapters.map((chapter) {
+                  final isActive = currentPosition >= chapter.timestamp;
+                  return InkWell(
+                    onTap: () => onSeek(chapter.timestamp),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      color: isActive ? Colors.grey.withOpacity(0.2) : null,
+                      child: Row(
+                        children: [
+                          // Chapter marker and line
+                          SizedBox(
+                            width: 24,
+                            child: Column(
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: isActive ? Colors.blue : Colors.grey,
+                                  ),
+                                ),
+                              ],
                             ),
-                            if (index < sortedChapters.length - 1)
-                              Container(
-                                width: 2,
-                                height: 24,
-                                color: Colors.grey.withOpacity(0.3),
-                              ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Chapter info
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              chapter.title,
-                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                fontWeight: isActive ? FontWeight.bold : null,
-                              ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Chapter info
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  chapter.title,
+                                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    fontWeight: isActive ? FontWeight.bold : null,
+                                  ),
+                                ),
+                                if (chapter.description?.isNotEmpty == true)
+                                  Text(
+                                    chapter.description!,
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                              ],
                             ),
-                            if (chapter.description?.isNotEmpty == true)
-                              Text(
-                                chapter.description!,
-                                style: Theme.of(context).textTheme.bodySmall,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                          ],
-                        ),
+                          ),
+                          // Timestamp
+                          Text(
+                            _formatTimestamp(chapter.timestamp),
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: isActive ? Colors.blue : Colors.grey,
+                            ),
+                          ),
+                        ],
                       ),
-                      // Timestamp
-                      Text(
-                        _formatTimestamp(chapter.timestamp),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: isActive ? Colors.blue : Colors.grey,
-                        ),
-                      ),
-                      // Edit/Delete buttons for studio view
-                      if (isEditable) ...[
-                        IconButton(
-                          icon: const Icon(Icons.edit, size: 18),
-                          onPressed: () {
-                            // TODO: Implement edit
-                          },
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, size: 18),
-                          onPressed: () {
-                            // TODO: Implement delete
-                          },
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              );
-            },
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
           ),
       ],
     );
