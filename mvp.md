@@ -95,7 +95,7 @@
      - Chapter visualization on timeline ✓
      - Scrollable chapter list in feed (NEW)
    - Studio view improvements:
-     - Chronological ordering of chapter list (NEW)
+     - Chronological ordering of chapter list ✓
      - Delete functionality for chapters (NEW)
      - Visual markers on timeline scrubber ✓
      - Chapter titles near markers when scrubbing ✓
@@ -109,14 +109,10 @@
 
 ### Next Steps:
 1. Studio View:
-   - Add delete functionality for chapters
-   - Implement chronological ordering of chapters
+   - Add delete functionality for chapters (Next)
    - Ensure smooth visual feedback after deletion
 
 2. Feed View:
-   - Add chronological chapter list below video
-   - Implement click-to-seek functionality
-   - Maintain existing auto-play behavior
    - Make chapter list scrollable
    - Handle overflow properly
    - Maintain smooth transitions

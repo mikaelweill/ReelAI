@@ -487,10 +487,14 @@ class _VideoEditorState extends State<VideoEditor> {
                     child: ListView.builder(
                       itemCount: _videoEdit!.chapters.length,
                       itemBuilder: (context, index) {
-                        // Create sorted list once before ListView.builder
+                        // Sort chapters by timestamp before ListView.builder
                         final sortedChapters = _videoEdit!.chapters.toList()
                           ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
-                        _videoEdit!.chapters = sortedChapters;  // Update the original list
+                        
+                        // Instead of assignment, clear and addAll
+                        _videoEdit!.chapters.clear();
+                        _videoEdit!.chapters.addAll(sortedChapters);
+                        
                         final chapter = _videoEdit!.chapters[index];
                         
                         return ListTile(
@@ -501,6 +505,35 @@ class _VideoEditorState extends State<VideoEditor> {
                                 (chapter.description != null
                                     ? ' - ${chapter.description}'
                                     : ''),
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () {
+                              // Show confirmation dialog
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Delete Chapter?'),
+                                  content: Text('Are you sure you want to delete "${chapter.title}"?'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        setState(() {
+                                          _videoEdit!.chapters.remove(chapter);
+                                        });
+                                        _saveVideoEdit(); // Save changes to Firestore
+                                        Navigator.pop(context);
+                                      },
+                                      child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
                           ),
                           onTap: () {
                             _controller.seekTo(
