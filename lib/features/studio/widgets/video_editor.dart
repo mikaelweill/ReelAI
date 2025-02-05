@@ -36,6 +36,8 @@ class _VideoEditorState extends State<VideoEditor> {
       })
       ..addListener(_videoListener);
     _initializeVideoPlayerFuture = _controller.initialize();
+    
+    print('Initializing video edit with ID: ${widget.video.id}');
     // Initialize _videoEdit immediately with empty state
     _videoEdit = VideoEdit(
       videoId: widget.video.id,
@@ -58,6 +60,11 @@ class _VideoEditorState extends State<VideoEditor> {
   Future<void> _loadVideoEdit() async {
     try {
       print('Loading video edit for video ID: ${widget.video.id}');
+      if (widget.video.id.isEmpty) {
+        print('Error: Video ID is empty');
+        return;
+      }
+
       final doc = await _firestore
           .collection('video_edits')
           .doc(widget.video.id)
@@ -65,16 +72,35 @@ class _VideoEditorState extends State<VideoEditor> {
       
       if (doc.exists) {
         print('Found existing video edit document');
+        final data = doc.data()!;
+        // Ensure videoId is set correctly when loading existing document
+        data['videoId'] = widget.video.id;
         setState(() {
-          _videoEdit = VideoEdit.fromJson(doc.data()!);
+          _videoEdit = VideoEdit.fromJson(data);
         });
       } else {
         print('No existing video edit document found, using empty state');
-        // _videoEdit is already initialized with empty state in initState
+        // Ensure videoId is set correctly in empty state
+        setState(() {
+          _videoEdit = VideoEdit(
+            videoId: widget.video.id,
+            textOverlays: [],
+            chapters: [],
+            lastModified: DateTime.now(),
+          );
+        });
       }
     } catch (e) {
       print('Error loading video edit: $e');
-      // _videoEdit will remain as initialized in initState
+      // Ensure videoId is set correctly even after error
+      setState(() {
+        _videoEdit = VideoEdit(
+          videoId: widget.video.id,
+          textOverlays: [],
+          chapters: [],
+          lastModified: DateTime.now(),
+        );
+      });
     }
   }
 
@@ -84,43 +110,68 @@ class _VideoEditorState extends State<VideoEditor> {
       return;
     }
 
-    // Update lastModified before saving
-    _videoEdit = VideoEdit(
-      videoId: _videoEdit!.videoId,
-      textOverlays: _videoEdit!.textOverlays,
-      chapters: _videoEdit!.chapters,
-      lastModified: DateTime.now(),
-    );
+    if (widget.video.id.isEmpty) {
+      print('Error: widget.video.id is empty. Video data: ${widget.video.toJson()}');
+      return;
+    }
 
-    print('Starting save operation...');
-    print('Video ID from widget: ${widget.video.id}');
-    print('Video ID from _videoEdit: ${_videoEdit!.videoId}');
-    print('Number of chapters: ${_videoEdit!.chapters.length}');
-    print('Video edit data: ${_videoEdit!.toJson()}');
+    print('\n--- Starting Save Operation ---');
+    print('Video details:');
+    print('- ID: ${widget.video.id}');
+    print('- Title: ${widget.video.title}');
+    print('- URL: ${widget.video.videoUrl}');
     
+    print('\nVideoEdit details:');
+    print('- VideoID: ${_videoEdit!.videoId}');
+    print('- Number of chapters: ${_videoEdit!.chapters.length}');
+    print('- Chapters: ${_videoEdit!.chapters.map((c) => '${c.title}@${c.timestamp}s').join(', ')}');
+
     try {
+      // Create a new VideoEdit with updated timestamp
+      final updatedEdit = VideoEdit(
+        videoId: widget.video.id, // Ensure we use the widget's video ID
+        textOverlays: _videoEdit!.textOverlays,
+        chapters: _videoEdit!.chapters,
+        lastModified: DateTime.now(),
+      );
+
       final docRef = _firestore
           .collection('video_edits')
           .doc(widget.video.id);
           
-      print('Saving to document: ${docRef.path}');
-      await docRef.set(_videoEdit!.toJson());
+      print('\nSaving to Firestore:');
+      print('- Collection: video_edits');
+      print('- Document path: ${docRef.path}');
+      print('- Data to save: ${updatedEdit.toJson()}');
 
-      print('Save successful');
+      await docRef.set(updatedEdit.toJson());
+
+      print('\nSave successful!');
+      setState(() {
+        _videoEdit = updatedEdit;
+      });
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Changes saved successfully')),
         );
       }
     } catch (e, stackTrace) {
-      print('Error saving video edit: $e');
-      print('Stack trace: $stackTrace');
+      print('\nError saving to Firestore:');
+      print('- Error: $e');
+      print('- Stack trace:\n$stackTrace');
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving changes: $e')),
+          SnackBar(
+            content: Text('Error saving changes: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
         );
       }
     }
+    print('--- End Save Operation ---\n');
   }
 
   void _addTextOverlay() {

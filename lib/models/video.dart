@@ -38,6 +38,7 @@ class Video {
   });
 
   factory Video.fromJson(Map<String, dynamic> json) {
+    print('Video.fromJson: $json');
     return Video(
       id: json['id'] ?? '',
       userId: json['userId'] ?? '',

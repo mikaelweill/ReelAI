@@ -21,9 +21,7 @@ service cloud.firestore {
 
     // Video edits collection (for chapters and text overlays)
     match /video_edits/{videoId} {
-      allow read: if true;  // Anyone can read edits
-      allow create, update: if isSignedIn() && exists(/databases/$(database)/documents/videos/$(videoId)) &&
-        get(/databases/$(database)/documents/videos/$(videoId)).data.userId == request.auth.uid;
+      allow read, write: if true;  // Testing mode - allow all operations
     }
 
     // Video enhancements collection

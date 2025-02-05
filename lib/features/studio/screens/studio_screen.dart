@@ -88,6 +88,7 @@ class _StudioScreenState extends State<StudioScreen> {
             itemCount: videos.length,
             itemBuilder: (context, index) {
               final videoData = videos[index].data() as Map<String, dynamic>;
+              videoData['id'] = videos[index].id;
               final video = Video.fromJson(videoData);
 
               return ListTile(
