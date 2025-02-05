@@ -52,40 +52,53 @@
    - Improved video metadata display ✓
    - Privacy controls with visual feedback ✓
 
-### Current Priority: Social Features
-1. Video Interactions
-   - Double-tap to like
-   - Like counter
-   - Share functionality
-   - Comment system
-   - View tracking
+### Current Priority: Studio Features (In Progress)
+1. Basic Studio Implementation ✓
+   - Studio screen layout ✓
+   - Video list view ✓
+   - Basic metadata display ✓
+   - Navigation integration ✓
 
-2. User Engagement
-   - User profiles
-   - Following system
-   - Activity feed
-   - Notifications
+2. Video Editor UI (In Progress)
+   - Video preview player ✓
+   - Timeline scrubber (Studio only)
+     - Basic slider with time display
+     - Marker positions for chapters/overlays
+     - Smooth seeking behavior
+     - Visual feedback during scrubbing
+   - Text overlay editor
+   - Chapter marker interface
+   - Timestamp management
 
-3. Content Discovery
-   - For You page
-   - Following feed
-   - Search functionality
-   - Hashtags system
+3. Enhancement Features (Next)
+   - Text overlay animations
+   - Custom fonts and styles
+   - Chapter preview thumbnails
+   - Sound adjustment controls
+   - Export with enhancements
 
 ### Next Steps:
-1. Performance Optimization
-   - Smart preloading of adjacent videos
-   - Better memory management
-   - Efficient cache handling
-   - Network optimization
-   - Video compression
+1. Immediate Focus
+   - Basic scrubber implementation in Studio
+     - Time-based slider component
+     - Current/total time display
+     - Seek to position functionality
+     - Play/pause integration
+   - Chapter marker placement
+   - Text overlay positioning
+   - Basic editing tools
 
-2. Advanced Features
-   - Background audio support
-   - Video filters
-   - Custom thumbnails
-   - Video trimming
-   - Music library
+2. Feed View (Current)
+   - Keep minimal interface ✓
+   - Simple chapter/timestamp buttons
+   - No scrubbing functionality
+   - Focus on content consumption
+
+3. Future Considerations (Post Core Features)
+   - Detail view implementation
+   - Advanced playback controls
+   - Enhanced navigation
+   - Additional player features
 
 ### Video Quality (Next Priority)
    - Generate and upload thumbnails
@@ -99,9 +112,18 @@
    - Loop playback ✓
    - Loading indicators ✓
    - Progressive buffering ✓
-   - Mute/unmute toggle (Next)
-   - Double-tap to like (Next)
-   - Share button (Next)
+   - Feed View:
+     - Clean, minimal interface
+     - Chapter/timestamp buttons
+     - No scrubbing in feed
+   - Studio View:
+     - Full scrubber controls
+     - Precise navigation
+     - Editing tools
+   - Detail View (Future):
+     - Basic scrubber
+     - Chapter navigation
+     - Enhanced playback controls
 
 ### Video Streaming Implementation
 1. Backend Processing
@@ -195,6 +217,34 @@ video_interactions/{videoId}/interactions/{userId} {
   viewProgress: number,  // How far user watched (percentage)
   lastViewedAt: timestamp,
   completedViews: number // Number of complete views
+}
+```
+
+#### Video Edits Collection (NEW) ✓
+```typescript
+video_edits/{videoId} ✓
+{
+  textOverlays: [{
+    id: string,          // Unique identifier ✓
+    text: string,        // Overlay text ✓
+    startTime: number,   // Start time in seconds ✓
+    endTime: number,     // End time in seconds ✓
+    top: number,         // Position from top (0-1) ✓
+    left: number,        // Position from left (0-1) ✓
+    style: string,       // Predefined style name ✓
+  }],
+  chapters: [{
+    id: string,          // Unique identifier ✓
+    title: string,       // Chapter title ✓
+    timestamp: number,   // Time in seconds ✓
+    description: string? // Optional description ✓
+  }],
+  soundEdits: {         // Sound modifications
+    volume: number,      // Master volume
+    fadeIn: number?,     // Fade in duration
+    fadeOut: number?,    // Fade out duration
+  },
+  lastModified: timestamp ✓
 }
 ```
 

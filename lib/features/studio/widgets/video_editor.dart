@@ -186,6 +186,56 @@ class _VideoEditorState extends State<VideoEditor> {
     );
   }
 
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
+    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
+    return "$twoDigitMinutes:$twoDigitSeconds";
+  }
+
+  Widget _buildScrubber() {
+    return Column(
+      children: [
+        // Time display
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                _formatDuration(_controller.value.position),
+                style: const TextStyle(color: Colors.white70),
+              ),
+              Text(
+                _formatDuration(_controller.value.duration),
+                style: const TextStyle(color: Colors.white70),
+              ),
+            ],
+          ),
+        ),
+        // Slider
+        SliderTheme(
+          data: SliderThemeData(
+            thumbColor: Colors.white,
+            activeTrackColor: Colors.white,
+            inactiveTrackColor: Colors.white24,
+            trackHeight: 2.0,
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+          ),
+          child: Slider(
+            value: _controller.value.position.inMilliseconds.toDouble(),
+            min: 0.0,
+            max: _controller.value.duration.inMilliseconds.toDouble(),
+            onChanged: (value) {
+              final Duration newPosition = Duration(milliseconds: value.round());
+              _controller.seekTo(newPosition);
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -247,11 +297,7 @@ class _VideoEditorState extends State<VideoEditor> {
                     ],
                   ),
                 ),
-                VideoProgressIndicator(
-                  _controller,
-                  allowScrubbing: true,
-                  padding: const EdgeInsets.all(8),
-                ),
+                _buildScrubber(),
                 Padding(
                   padding: const EdgeInsets.all(8.0),
                   child: Row(
