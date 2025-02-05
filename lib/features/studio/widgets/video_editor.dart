@@ -436,12 +436,6 @@ class _VideoEditorState extends State<VideoEditor> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit Video'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.save),
-            onPressed: _saveVideoEdit,
-          ),
-        ],
       ),
       body: FutureBuilder(
         future: _initializeVideoPlayerFuture,
