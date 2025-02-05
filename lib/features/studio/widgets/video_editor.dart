@@ -180,13 +180,14 @@ class _VideoEditorState extends State<VideoEditor> {
 
   void _addTextOverlay() {
     final currentTime = _currentPosition;
+    String text = '';
+    double duration = 3.0;
+    
     showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            String text = '';
-            double duration = 3.0; // Default duration
             return AlertDialog(
               title: const Text('Add Text Overlay'),
               content: Column(
@@ -201,14 +202,14 @@ class _VideoEditorState extends State<VideoEditor> {
                   const SizedBox(height: 16),
                   Row(
                     children: [
-                      const Text('Duration: '),
+                      Text('Duration: ${duration.toStringAsFixed(1)}s'),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Slider(
                           value: duration,
                           min: 1.0,
                           max: 10.0,
                           divisions: 18,
-                          label: '${duration.toStringAsFixed(1)}s',
                           onChanged: (value) {
                             setDialogState(() {
                               duration = value;
@@ -242,7 +243,6 @@ class _VideoEditorState extends State<VideoEditor> {
                         );
                       });
                       Navigator.pop(context);
-                      // Save changes to Firestore
                       await _saveVideoEdit();
                     }
                   },
@@ -460,19 +460,26 @@ class _VideoEditorState extends State<VideoEditor> {
                                 overlay.endTime >= _currentPosition)
                             .map(
                               (overlay) => Positioned(
-                                top: overlay.top * _controller.value.size.height,
-                                left: overlay.left * _controller.value.size.width,
-                                child: Text(
-                                  overlay.text,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 24,
-                                    shadows: [
-                                      Shadow(
-                                        blurRadius: 4,
-                                        color: Colors.black,
+                                left: 0,
+                                right: 0,
+                                bottom: 50, // Add some padding from bottom
+                                child: Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                                    child: Text(
+                                      overlay.text,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 24,
+                                        shadows: [
+                                          Shadow(
+                                            blurRadius: 4,
+                                            color: Colors.black,
+                                          ),
+                                        ],
                                       ),
-                                    ],
+                                    ),
                                   ),
                                 ),
                               ),
