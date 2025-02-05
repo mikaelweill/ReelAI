@@ -180,10 +180,12 @@ class _VideoEditorState extends State<VideoEditor> {
     print('--- End Save Operation ---\n');
   }
 
-  void _addTextOverlay() {
-    final currentTime = _currentPosition;
-    String text = '';
-    double duration = 3.0;
+  void _addTextOverlay({TextOverlay? existingOverlay}) {
+    final currentTime = existingOverlay?.startTime ?? _currentPosition;
+    String text = existingOverlay?.text ?? '';
+    double duration = existingOverlay != null 
+        ? existingOverlay.endTime - existingOverlay.startTime 
+        : 3.0;
     
     showDialog(
       context: context,
@@ -191,11 +193,14 @@ class _VideoEditorState extends State<VideoEditor> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: const Text('Add Text Overlay'),
+              title: Text(existingOverlay != null ? 'Edit Text Overlay' : 'Add Text Overlay'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextField(
+                    controller: TextEditingController(text: text)..selection = TextSelection.fromPosition(
+                      TextPosition(offset: text.length),
+                    ),
                     onChanged: (value) => text = value,
                     decoration: const InputDecoration(
                       hintText: 'Enter text',
@@ -232,9 +237,16 @@ class _VideoEditorState extends State<VideoEditor> {
                   onPressed: () async {
                     if (text.isNotEmpty) {
                       setState(() {
+                        if (existingOverlay != null) {
+                          // Remove existing overlay
+                          _videoEdit?.textOverlays.removeWhere(
+                            (overlay) => overlay.id == existingOverlay.id
+                          );
+                        }
+                        // Add new or updated overlay
                         _videoEdit?.textOverlays.add(
                           TextOverlay(
-                            id: _uuid.v4(),
+                            id: existingOverlay?.id ?? _uuid.v4(),
                             text: text,
                             startTime: currentTime,
                             endTime: currentTime + duration,
@@ -248,7 +260,7 @@ class _VideoEditorState extends State<VideoEditor> {
                       await _saveVideoEdit();
                     }
                   },
-                  child: const Text('Add'),
+                  child: Text(existingOverlay != null ? 'Save' : 'Add'),
                 ),
               ],
             );
@@ -512,7 +524,7 @@ class _VideoEditorState extends State<VideoEditor> {
                       ),
                       IconButton(
                         icon: const Icon(Icons.text_fields),
-                        onPressed: _addTextOverlay,
+                        onPressed: () => _addTextOverlay(),
                       ),
                       IconButton(
                         icon: const Icon(Icons.bookmark_add),
@@ -523,218 +535,234 @@ class _VideoEditorState extends State<VideoEditor> {
                 ),
                 if (_videoEdit != null && (_videoEdit!.chapters.isNotEmpty || _videoEdit!.textOverlays.isNotEmpty))
                   Expanded(
-                    child: Column(
-                      children: [
-                        // Chapters section
-                        if (_videoEdit!.chapters.isNotEmpty)
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Chapter header with expand/collapse
-                              GestureDetector(
-                                onTap: () => setState(() {
-                                  _isChapterListExpanded = !_isChapterListExpanded;
-                                }),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.bookmark, size: 16, color: Colors.white70),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Chapters (${_videoEdit!.chapters.length})',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Chapters section
+                          if (_videoEdit!.chapters.isNotEmpty)
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Chapter header with expand/collapse
+                                GestureDetector(
+                                  onTap: () => setState(() {
+                                    _isChapterListExpanded = !_isChapterListExpanded;
+                                  }),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.bookmark, size: 16, color: Colors.white70),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Chapters (${_videoEdit!.chapters.length})',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
-                                      ),
-                                      const Spacer(),
-                                      Icon(
-                                        _isChapterListExpanded ? Icons.expand_less : Icons.expand_more,
-                                        color: Colors.white70,
-                                      ),
-                                    ],
+                                        const Spacer(),
+                                        Icon(
+                                          _isChapterListExpanded ? Icons.expand_less : Icons.expand_more,
+                                          color: Colors.white70,
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                              // Chapter list (collapsible)
-                              if (_isChapterListExpanded)
-                                SizedBox(
-                                  height: 200, // Fixed height for the list
-                                  child: ListView.builder(
-                                    itemCount: _videoEdit!.chapters.length,
-                                    itemBuilder: (context, index) {
-                                      final sortedChapters = _videoEdit!.chapters.toList()
-                                        ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
-                                      
-                                      _videoEdit!.chapters.clear();
-                                      _videoEdit!.chapters.addAll(sortedChapters);
-                                      
-                                      final chapter = _videoEdit!.chapters[index];
-                                      
-                                      return ListTile(
-                                        leading: const Icon(Icons.bookmark),
-                                        title: Text(chapter.title),
-                                        subtitle: Text(
-                                          '${chapter.timestamp.toStringAsFixed(1)}s' +
-                                              (chapter.description != null
-                                                  ? ' - ${chapter.description}'
-                                                  : ''),
-                                        ),
-                                        trailing: IconButton(
-                                          icon: const Icon(Icons.delete, color: Colors.red),
-                                          onPressed: () {
-                                            showDialog(
-                                              context: context,
-                                              builder: (context) => AlertDialog(
-                                                title: const Text('Delete Chapter?'),
-                                                content: Text('Are you sure you want to delete "${chapter.title}"?'),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () => Navigator.pop(context),
-                                                    child: const Text('Cancel'),
-                                                  ),
-                                                  TextButton(
-                                                    onPressed: () {
-                                                      setState(() {
-                                                        _videoEdit!.chapters.remove(chapter);
-                                                      });
-                                                      _saveVideoEdit();
-                                                      Navigator.pop(context);
-                                                    },
-                                                    child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                                                  ),
-                                                ],
+                                // Chapter list (collapsible)
+                                if (_isChapterListExpanded)
+                                  Container(
+                                    constraints: const BoxConstraints(maxHeight: 200),
+                                    child: ListView.builder(
+                                      shrinkWrap: true,
+                                      physics: const ClampingScrollPhysics(),
+                                      itemCount: _videoEdit!.chapters.length,
+                                      itemBuilder: (context, index) {
+                                        final sortedChapters = _videoEdit!.chapters.toList()
+                                          ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+                                        
+                                        _videoEdit!.chapters.clear();
+                                        _videoEdit!.chapters.addAll(sortedChapters);
+                                        
+                                        final chapter = _videoEdit!.chapters[index];
+                                        
+                                        return ListTile(
+                                          leading: const Icon(Icons.bookmark),
+                                          title: Text(chapter.title),
+                                          subtitle: Text(
+                                            '${chapter.timestamp.toStringAsFixed(1)}s' +
+                                                (chapter.description != null
+                                                    ? ' - ${chapter.description}'
+                                                    : ''),
+                                          ),
+                                          trailing: IconButton(
+                                            icon: const Icon(Icons.delete, color: Colors.red),
+                                            onPressed: () {
+                                              showDialog(
+                                                context: context,
+                                                builder: (context) => AlertDialog(
+                                                  title: const Text('Delete Chapter?'),
+                                                  content: Text('Are you sure you want to delete "${chapter.title}"?'),
+                                                  actions: [
+                                                    TextButton(
+                                                      onPressed: () => Navigator.pop(context),
+                                                      child: const Text('Cancel'),
+                                                    ),
+                                                    TextButton(
+                                                      onPressed: () {
+                                                        setState(() {
+                                                          _videoEdit!.chapters.remove(chapter);
+                                                        });
+                                                        _saveVideoEdit();
+                                                        Navigator.pop(context);
+                                                      },
+                                                      child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                                    ),
+                                                  ],
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                          onTap: () {
+                                            _controller.seekTo(
+                                              Duration(
+                                                milliseconds: (chapter.timestamp * 1000).round(),
                                               ),
                                             );
                                           },
+                                        );
+                                      },
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          
+                          // Text Overlays section
+                          if (_videoEdit!.textOverlays.isNotEmpty)
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Text overlay header with expand/collapse
+                                GestureDetector(
+                                  onTap: () => setState(() {
+                                    _isTextOverlayListExpanded = !_isTextOverlayListExpanded;
+                                  }),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.text_fields, size: 16, color: Colors.white70),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Text Overlays (${_videoEdit!.textOverlays.length})',
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
-                                        onTap: () {
-                                          _controller.seekTo(
-                                            Duration(
-                                              milliseconds: (chapter.timestamp * 1000).round(),
+                                        const Spacer(),
+                                        Icon(
+                                          _isTextOverlayListExpanded ? Icons.expand_less : Icons.expand_more,
+                                          color: Colors.white70,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                // Text overlay list (collapsible)
+                                if (_isTextOverlayListExpanded)
+                                  Container(
+                                    constraints: const BoxConstraints(maxHeight: 200),
+                                    child: ListView.builder(
+                                      shrinkWrap: true,
+                                      physics: const ClampingScrollPhysics(),
+                                      itemCount: _videoEdit!.textOverlays.length,
+                                      itemBuilder: (context, index) {
+                                        final sortedOverlays = _videoEdit!.textOverlays.toList()
+                                          ..sort((a, b) => a.startTime.compareTo(b.startTime));
+                                        
+                                        _videoEdit!.textOverlays.clear();
+                                        _videoEdit!.textOverlays.addAll(sortedOverlays);
+                                        
+                                        final overlay = _videoEdit!.textOverlays[index];
+                                        final isActive = _currentPosition >= overlay.startTime && 
+                                                       _currentPosition <= overlay.endTime;
+                                        
+                                        return ListTile(
+                                          leading: Icon(
+                                            Icons.text_fields,
+                                            color: isActive ? Colors.white : Colors.white38,
+                                          ),
+                                          title: Text(
+                                            overlay.text,
+                                            style: TextStyle(
+                                              color: isActive ? Colors.white : Colors.white70,
                                             ),
-                                          );
-                                        },
-                                      );
-                                    },
-                                  ),
-                                ),
-                            ],
-                          ),
-                        
-                        // Text Overlays section
-                        if (_videoEdit!.textOverlays.isNotEmpty)
-                          Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Text overlay header with expand/collapse
-                              GestureDetector(
-                                onTap: () => setState(() {
-                                  _isTextOverlayListExpanded = !_isTextOverlayListExpanded;
-                                }),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.text_fields, size: 16, color: Colors.white70),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Text Overlays (${_videoEdit!.textOverlays.length})',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const Spacer(),
-                                      Icon(
-                                        _isTextOverlayListExpanded ? Icons.expand_less : Icons.expand_more,
-                                        color: Colors.white70,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              // Text overlay list (collapsible)
-                              if (_isTextOverlayListExpanded)
-                                SizedBox(
-                                  height: 200, // Fixed height for the list
-                                  child: ListView.builder(
-                                    itemCount: _videoEdit!.textOverlays.length,
-                                    itemBuilder: (context, index) {
-                                      final sortedOverlays = _videoEdit!.textOverlays.toList()
-                                        ..sort((a, b) => a.startTime.compareTo(b.startTime));
-                                      
-                                      _videoEdit!.textOverlays.clear();
-                                      _videoEdit!.textOverlays.addAll(sortedOverlays);
-                                      
-                                      final overlay = _videoEdit!.textOverlays[index];
-                                      final isActive = _currentPosition >= overlay.startTime && 
-                                                     _currentPosition <= overlay.endTime;
-                                      
-                                      return ListTile(
-                                        leading: Icon(
-                                          Icons.text_fields,
-                                          color: isActive ? Colors.white : Colors.white38,
-                                        ),
-                                        title: Text(
-                                          overlay.text,
-                                          style: TextStyle(
-                                            color: isActive ? Colors.white : Colors.white70,
                                           ),
-                                        ),
-                                        subtitle: Text(
-                                          '${overlay.startTime.toStringAsFixed(1)}s - ${overlay.endTime.toStringAsFixed(1)}s',
-                                          style: TextStyle(
-                                            color: isActive ? Colors.white70 : Colors.white38,
+                                          subtitle: Text(
+                                            '${overlay.startTime.toStringAsFixed(1)}s - ${overlay.endTime.toStringAsFixed(1)}s',
+                                            style: TextStyle(
+                                              color: isActive ? Colors.white70 : Colors.white38,
+                                            ),
                                           ),
-                                        ),
-                                        trailing: IconButton(
-                                          icon: const Icon(Icons.delete, color: Colors.red),
-                                          onPressed: () {
-                                            showDialog(
-                                              context: context,
-                                              builder: (context) => AlertDialog(
-                                                title: const Text('Delete Text Overlay?'),
-                                                content: Text('Are you sure you want to delete "${overlay.text}"?'),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () => Navigator.pop(context),
-                                                    child: const Text('Cancel'),
-                                                  ),
-                                                  TextButton(
-                                                    onPressed: () {
-                                                      setState(() {
-                                                        _videoEdit!.textOverlays.remove(overlay);
-                                                      });
-                                                      _saveVideoEdit();
-                                                      Navigator.pop(context);
-                                                    },
-                                                    child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                                                  ),
-                                                ],
+                                          trailing: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              IconButton(
+                                                icon: const Icon(Icons.edit, color: Colors.white70),
+                                                onPressed: () => _addTextOverlay(existingOverlay: overlay),
+                                              ),
+                                              IconButton(
+                                                icon: const Icon(Icons.delete, color: Colors.red),
+                                                onPressed: () {
+                                                  showDialog(
+                                                    context: context,
+                                                    builder: (context) => AlertDialog(
+                                                      title: const Text('Delete Text Overlay?'),
+                                                      content: Text('Are you sure you want to delete "${overlay.text}"?'),
+                                                      actions: [
+                                                        TextButton(
+                                                          onPressed: () => Navigator.pop(context),
+                                                          child: const Text('Cancel'),
+                                                        ),
+                                                        TextButton(
+                                                          onPressed: () {
+                                                            setState(() {
+                                                              _videoEdit!.textOverlays.remove(overlay);
+                                                            });
+                                                            _saveVideoEdit();
+                                                            Navigator.pop(context);
+                                                          },
+                                                          child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  );
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                          onTap: () {
+                                            _controller.seekTo(
+                                              Duration(
+                                                milliseconds: (overlay.startTime * 1000).round(),
                                               ),
                                             );
                                           },
-                                        ),
-                                        onTap: () {
-                                          _controller.seekTo(
-                                            Duration(
-                                              milliseconds: (overlay.startTime * 1000).round(),
-                                            ),
-                                          );
-                                        },
-                                      );
-                                    },
+                                        );
+                                      },
+                                    ),
                                   ),
-                                ),
-                            ],
-                          ),
-                      ],
+                              ],
+                            ),
+                        ],
+                      ),
                     ),
                   ),
               ],

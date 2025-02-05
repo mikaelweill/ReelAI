@@ -77,18 +77,20 @@
      - Chapter titles on hover/scrub ✓
      - Smooth seeking behavior ✓
      - Visual feedback during scrubbing ✓
-   - Text Overlay System (In Progress)
+   - Text Overlay System ✓
      - Basic text input dialog ✓
      - Timed text overlays on video ✓
      - Custom duration control ✓
      - Centered text positioning ✓
      - Text shadow for readability ✓
      - Delete functionality ✓
-     - Missing Features:
+     - Preview in feed/my videos ✓
+     - Collapsible list view ✓
+     - Auto-save on changes ✓
+     - Future Improvements:
        - Edit functionality
        - Style presets
        - Position control
-       - Preview in feed/my videos
    - Chapter marker interface ✓
      - Add markers in Studio ✓
      - Delete markers in Studio ✓
@@ -98,20 +100,21 @@
      - Chapter visualization on timeline ✓
      - Scrollable chapter list in feed ✓
      - Chronological ordering ✓
+     - Collapsible list view ✓
+     - Auto-save on changes ✓
 
 ### Immediate Next Steps (Prioritized):
-1. Text Overlay System
-   - Add edit functionality for existing overlays
-   - Implement text overlay preview in feed/my videos
-   - Add style presets (optional)
-   - Add position control (optional)
-
-2. Video Quality & Performance
+1. Video Quality & Performance
    - Generate and upload thumbnails
    - Optimize initial load time
    - Add loading placeholders
    - Adjust resolution settings
    - Optimize file size
+
+2. Text Overlay Enhancements (Optional)
+   - Add edit functionality
+   - Add style presets
+   - Add position control
 
 3. Feed View Improvements
    - Ensure smooth transitions
