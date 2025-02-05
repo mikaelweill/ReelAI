@@ -36,6 +36,14 @@ class _VideoEditorState extends State<VideoEditor> {
       })
       ..addListener(_videoListener);
     _initializeVideoPlayerFuture = _controller.initialize();
+    // Initialize _videoEdit immediately with empty state
+    _videoEdit = VideoEdit(
+      videoId: widget.video.id,
+      textOverlays: [],
+      chapters: [],
+      lastModified: DateTime.now(),
+    );
+    // Then load any existing edits
     _loadVideoEdit();
   }
 
@@ -48,39 +56,70 @@ class _VideoEditorState extends State<VideoEditor> {
   }
 
   Future<void> _loadVideoEdit() async {
-    final doc = await _firestore
-        .collection('video_edits')
-        .doc(widget.video.id)
-        .get();
-    
-    if (doc.exists) {
-      setState(() {
-        _videoEdit = VideoEdit.fromJson(doc.data()!);
-      });
-    } else {
-      setState(() {
-        _videoEdit = VideoEdit(
-          videoId: widget.video.id,
-          textOverlays: [],
-          chapters: [],
-          lastModified: DateTime.now(),
-        );
-      });
+    try {
+      print('Loading video edit for video ID: ${widget.video.id}');
+      final doc = await _firestore
+          .collection('video_edits')
+          .doc(widget.video.id)
+          .get();
+      
+      if (doc.exists) {
+        print('Found existing video edit document');
+        setState(() {
+          _videoEdit = VideoEdit.fromJson(doc.data()!);
+        });
+      } else {
+        print('No existing video edit document found, using empty state');
+        // _videoEdit is already initialized with empty state in initState
+      }
+    } catch (e) {
+      print('Error loading video edit: $e');
+      // _videoEdit will remain as initialized in initState
     }
   }
 
   Future<void> _saveVideoEdit() async {
-    if (_videoEdit == null) return;
+    if (_videoEdit == null) {
+      print('Error: _videoEdit is null');
+      return;
+    }
 
-    await _firestore
-        .collection('video_edits')
-        .doc(widget.video.id)
-        .set(_videoEdit!.toJson());
+    // Update lastModified before saving
+    _videoEdit = VideoEdit(
+      videoId: _videoEdit!.videoId,
+      textOverlays: _videoEdit!.textOverlays,
+      chapters: _videoEdit!.chapters,
+      lastModified: DateTime.now(),
+    );
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Changes saved successfully')),
-      );
+    print('Starting save operation...');
+    print('Video ID from widget: ${widget.video.id}');
+    print('Video ID from _videoEdit: ${_videoEdit!.videoId}');
+    print('Number of chapters: ${_videoEdit!.chapters.length}');
+    print('Video edit data: ${_videoEdit!.toJson()}');
+    
+    try {
+      final docRef = _firestore
+          .collection('video_edits')
+          .doc(widget.video.id);
+          
+      print('Saving to document: ${docRef.path}');
+      await docRef.set(_videoEdit!.toJson());
+
+      print('Save successful');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Changes saved successfully')),
+        );
+      }
+    } catch (e, stackTrace) {
+      print('Error saving video edit: $e');
+      print('Stack trace: $stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving changes: $e')),
+        );
+      }
     }
   }
 
@@ -163,8 +202,9 @@ class _VideoEditorState extends State<VideoEditor> {
               child: const Text('Cancel'),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 if (title.isNotEmpty) {
+                  print('Adding chapter and preparing to save...');
                   setState(() {
                     _videoEdit?.chapters.add(
                       ChapterMark(
@@ -175,8 +215,12 @@ class _VideoEditorState extends State<VideoEditor> {
                       ),
                     );
                   });
+                  print('Added chapter mark at ${currentTime}s');
+                  print('Current number of chapters: ${_videoEdit?.chapters.length}');
+                  Navigator.pop(context);
+                  // Call save after dialog is closed
+                  await _saveVideoEdit();
                 }
-                Navigator.pop(context);
               },
               child: const Text('Add'),
             ),
@@ -194,6 +238,9 @@ class _VideoEditorState extends State<VideoEditor> {
   }
 
   Widget _buildScrubber() {
+    final duration = _controller.value.duration;
+    final totalMillis = duration.inMilliseconds.toDouble();
+    
     return Column(
       children: [
         // Time display
@@ -207,33 +254,92 @@ class _VideoEditorState extends State<VideoEditor> {
                 style: const TextStyle(color: Colors.white70),
               ),
               Text(
-                _formatDuration(_controller.value.duration),
+                _formatDuration(duration),
                 style: const TextStyle(color: Colors.white70),
               ),
             ],
           ),
         ),
-        // Slider
-        SliderTheme(
-          data: SliderThemeData(
-            thumbColor: Colors.white,
-            activeTrackColor: Colors.white,
-            inactiveTrackColor: Colors.white24,
-            trackHeight: 2.0,
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-          ),
-          child: Slider(
-            value: _controller.value.position.inMilliseconds.toDouble(),
-            min: 0.0,
-            max: _controller.value.duration.inMilliseconds.toDouble(),
-            onChanged: (value) {
-              final Duration newPosition = Duration(milliseconds: value.round());
-              _controller.seekTo(newPosition);
-            },
+        // Slider with Chapter Markers
+        SizedBox(
+          height: 40, // Explicit height for the slider area
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Chapter Markers
+              if (_videoEdit != null && _videoEdit!.chapters.isNotEmpty)
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: ChapterMarkerPainter(
+                      chapters: _videoEdit!.chapters,
+                      duration: totalMillis,
+                      currentPosition: _controller.value.position.inMilliseconds.toDouble(),
+                    ),
+                  ),
+                ),
+              // Main Slider
+              SliderTheme(
+                data: SliderThemeData(
+                  thumbColor: Colors.white,
+                  activeTrackColor: Colors.white,
+                  inactiveTrackColor: Colors.white24,
+                  trackHeight: 2.0,
+                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                ),
+                child: Slider(
+                  value: _controller.value.position.inMilliseconds.toDouble(),
+                  min: 0.0,
+                  max: totalMillis,
+                  onChanged: (value) {
+                    final Duration newPosition = Duration(milliseconds: value.round());
+                    _controller.seekTo(newPosition);
+                  },
+                ),
+              ),
+              // Chapter Titles (show when near marker)
+              if (_videoEdit != null)
+                ..._buildChapterLabels(totalMillis),
+            ],
           ),
         ),
       ],
     );
+  }
+
+  List<Widget> _buildChapterLabels(double totalDuration) {
+    const double showThreshold = 0.05; // Show label when within 5% of chapter
+    final currentPos = _controller.value.position.inMilliseconds.toDouble();
+    
+    return _videoEdit!.chapters.map((chapter) {
+      final chapterPos = chapter.timestamp * 1000;
+      final distance = (currentPos - chapterPos).abs() / totalDuration;
+      
+      // Only show label when scrubbing near the chapter
+      if (distance > showThreshold) return const SizedBox.shrink();
+      
+      // Calculate position for the label
+      final position = chapterPos / totalDuration;
+      
+      return Positioned(
+        left: position * MediaQuery.of(context).size.width,
+        bottom: 20, // Position above the slider
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.black87,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            chapter.title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+            ),
+          ),
+        ),
+      );
+    }).toList();
   }
 
   @override
@@ -367,4 +473,45 @@ class _VideoEditorState extends State<VideoEditor> {
     _controller.dispose();
     super.dispose();
   }
+}
+
+class ChapterMarkerPainter extends CustomPainter {
+  final List<ChapterMark> chapters;
+  final double duration;
+  final double currentPosition;
+
+  ChapterMarkerPainter({
+    required this.chapters,
+    required this.duration,
+    required this.currentPosition,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    for (final chapter in chapters) {
+      final position = (chapter.timestamp * 1000) / duration;
+      final x = position * size.width;
+      
+      // Draw marker line
+      canvas.drawRect(
+        Rect.fromLTWH(x - 1, 0, 2, size.height),
+        paint,
+      );
+      
+      // Draw dot at top
+      canvas.drawCircle(
+        Offset(x, size.height / 2),
+        3,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(ChapterMarkerPainter oldDelegate) =>
+      currentPosition != oldDelegate.currentPosition;
 } 
