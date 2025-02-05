@@ -28,9 +28,11 @@ class _VideoFeedState extends State<VideoFeed> {
   static const int _maxControllers = 3;
   String? _currentlyPlayingUrl;
   final Map<String, bool> _bufferingStates = {};
+  final PageController _pageController = PageController();
 
   @override
   void dispose() {
+    _pageController.dispose();
     for (var controller in _controllers.values) {
       controller.dispose();
     }
@@ -194,10 +196,10 @@ class _VideoFeedState extends State<VideoFeed> {
           );
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+        return PageView.builder(
+          scrollDirection: Axis.vertical,
+          controller: _pageController,
           itemCount: videos.length,
-          cacheExtent: 0,
           itemBuilder: (context, index) {
             final video = videos[index];
             
@@ -205,30 +207,33 @@ class _VideoFeedState extends State<VideoFeed> {
               future: _getController(video.videoUrl),
               builder: (context, controllerSnapshot) {
                 if (!controllerSnapshot.hasData || controllerSnapshot.data == null) {
-                  return _buildVideoPlaceholder(
-                    video, 
-                    _bufferingStates[video.videoUrl] ?? true
+                  return SizedBox.expand(
+                    child: _buildVideoPlaceholder(
+                      video, 
+                      _bufferingStates[video.videoUrl] ?? true
+                    ),
                   );
                 }
 
-                return Stack(
-                  children: [
-                    VideoCard(
-                      video: video,
-                      controller: controllerSnapshot.data!,
-                      onVisibilityChanged: (isVisible) => 
-                          onVideoVisibilityChanged(video.videoUrl, isVisible),
-                      showPrivacyIndicator: widget.showPrivacyControls,
-                      onDelete: widget.allowDeletion 
-                          ? () {
-                              VideoFeedService().deleteVideo(video.id);
-                              widget.onVideoDeleted?.call();
-                            }
-                          : null,
-                    ),
-                    if (_bufferingStates[video.videoUrl] ?? false)
-                      Positioned.fill(
-                        child: Container(
+                return SizedBox.expand(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      VideoCard(
+                        video: video,
+                        controller: controllerSnapshot.data!,
+                        onVisibilityChanged: (isVisible) => 
+                            onVideoVisibilityChanged(video.videoUrl, isVisible),
+                        showPrivacyIndicator: widget.showPrivacyControls,
+                        onDelete: widget.allowDeletion 
+                            ? () {
+                                VideoFeedService().deleteVideo(video.id);
+                                widget.onVideoDeleted?.call();
+                              }
+                            : null,
+                      ),
+                      if (_bufferingStates[video.videoUrl] ?? false)
+                        Container(
                           color: Colors.black26,
                           child: const Center(
                             child: CircularProgressIndicator(
@@ -237,8 +242,8 @@ class _VideoFeedState extends State<VideoFeed> {
                             ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 );
               },
             );

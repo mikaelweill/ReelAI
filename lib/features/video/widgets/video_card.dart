@@ -89,60 +89,74 @@ class _VideoCardState extends State<VideoCard> {
       key: Key(widget.video.id),
       onVisibilityChanged: (info) {
         final wasVisible = _isVisible;
-        _isVisible = info.visibleFraction > 0.7;  // Only consider visible if more than 70% shown
+        _isVisible = info.visibleFraction > 0.7;
         
         if (wasVisible != _isVisible) {
           widget.onVisibilityChanged?.call(_isVisible);
         }
       },
-      child: Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: Container(
+        color: Colors.black,
+        child: Stack(
           children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            // Center the video with correct aspect ratio
+            Center(
               child: AspectRatio(
                 aspectRatio: widget.video.aspectRatio,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    VideoPlayer(widget.controller),
-                    Positioned.fill(
-                      child: GestureDetector(
-                        onTap: () {
-                          if (widget.controller.value.isPlaying) {
-                            widget.controller.pause();
-                          } else {
-                            // When playing, notify parent to handle coordination
-                            widget.onVisibilityChanged?.call(true);
-                          }
-                        },
-                        child: Container(
-                          color: Colors.transparent,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                child: VideoPlayer(widget.controller),
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
+            // Video controls overlay
+            GestureDetector(
+              onTap: () {
+                if (widget.controller.value.isPlaying) {
+                  widget.controller.pause();
+                } else {
+                  widget.controller.play();
+                }
+              },
+              child: Container(
+                color: Colors.transparent,
+              ),
+            ),
+            // Video info overlay
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: MediaQuery.of(context).padding.bottom + 16,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     widget.video.title,
-                    style: Theme.of(context).textTheme.titleLarge,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      shadows: [
+                        Shadow(
+                          offset: Offset(1.0, 1.0),
+                          blurRadius: 3.0,
+                          color: Color.fromARGB(255, 0, 0, 0),
+                        ),
+                      ],
+                    ),
                   ),
                   if (widget.video.description?.isNotEmpty == true) ...[
                     const SizedBox(height: 4),
                     Text(
                       widget.video.description!,
-                      style: Theme.of(context).textTheme.bodyMedium,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                        shadows: [
+                          Shadow(
+                            offset: Offset(1.0, 1.0),
+                            blurRadius: 3.0,
+                            color: Color.fromARGB(255, 0, 0, 0),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                   const SizedBox(height: 8),
@@ -151,9 +165,17 @@ class _VideoCardState extends State<VideoCard> {
                     children: [
                       Text(
                         'Created: ${_formatDate(widget.video.createdAt)}',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.grey[400],
+                        style: const TextStyle(
+                          color: Colors.white60,
+                          fontSize: 12,
+                          shadows: [
+                            Shadow(
+                              offset: Offset(1.0, 1.0),
+                              blurRadius: 3.0,
+                              color: Color.fromARGB(255, 0, 0, 0),
                             ),
+                          ],
+                        ),
                       ),
                       if (widget.showPrivacyIndicator || widget.onDelete != null)
                         Row(
@@ -161,22 +183,37 @@ class _VideoCardState extends State<VideoCard> {
                             if (widget.showPrivacyIndicator)
                               GestureDetector(
                                 onTap: _showPrivacyConfirmation,
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      widget.video.isPrivate ? Icons.lock : Icons.public,
-                                      color: Colors.grey[400],
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 8),
-                                  ],
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black45,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Icon(
+                                    widget.video.isPrivate ? Icons.lock : Icons.public,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
                                 ),
                               ),
-                            if (widget.onDelete != null)
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline),
-                                onPressed: widget.onDelete,
+                            if (widget.onDelete != null) ...[
+                              const SizedBox(width: 16),
+                              GestureDetector(
+                                onTap: widget.onDelete,
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black45,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Icon(
+                                    Icons.delete,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                ),
                               ),
+                            ],
                           ],
                         ),
                     ],
