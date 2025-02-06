@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart' as mk;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
-import '../../../models/video.dart';
+import '../../../models/video.dart' as model;
 import '../models/video_edit.dart';
 
 class VideoEditor extends StatefulWidget {
-  final Video video;
+  final model.Video video;
 
   const VideoEditor({
     super.key,
@@ -18,7 +19,8 @@ class VideoEditor extends StatefulWidget {
 }
 
 class _VideoEditorState extends State<VideoEditor> {
-  late VideoPlayerController _controller;
+  late Player _player;
+  late mk.VideoController _controller;
   late Future<void> _initializeVideoPlayerFuture;
   final _firestore = FirebaseFirestore.instance;
   
@@ -32,12 +34,9 @@ class _VideoEditorState extends State<VideoEditor> {
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.network(widget.video.videoUrl)
-      ..initialize().then((_) {
-        setState(() {});
-      })
-      ..addListener(_videoListener);
-    _initializeVideoPlayerFuture = _controller.initialize();
+    _player = Player();
+    _controller = mk.VideoController(_player);
+    _initializeVideoPlayerFuture = _initializePlayer();
     
     print('Initializing video edit with ID: ${widget.video.id}');
     // Initialize _videoEdit immediately with empty state
@@ -52,12 +51,27 @@ class _VideoEditorState extends State<VideoEditor> {
     _loadVideoEdit();
   }
 
-  void _videoListener() {
-    if (_controller.value.isInitialized) {
-      setState(() {
-        _currentPosition = _controller.value.position.inMilliseconds / 1000;
-      });
-    }
+  Future<void> _initializePlayer() async {
+    await _player.open(Media(widget.video.videoUrl));
+    await _player.setPlaylistMode(PlaylistMode.loop);
+    
+    // Set up position listener
+    _player.stream.position.listen((position) {
+      if (mounted) {
+        setState(() {
+          _currentPosition = position.inMilliseconds / 1000;
+        });
+      }
+    });
+    
+    // Set up playing state listener
+    _player.stream.playing.listen((playing) {
+      if (mounted) {
+        setState(() {
+          _isPlaying = playing;
+        });
+      }
+    });
   }
 
   Future<void> _loadVideoEdit() async {
@@ -339,7 +353,8 @@ class _VideoEditorState extends State<VideoEditor> {
   }
 
   Widget _buildScrubber() {
-    final duration = _controller.value.duration;
+    final duration = _player.state.duration;
+    final position = _player.state.position;
     final totalMillis = duration.inMilliseconds.toDouble();
     
     return Column(
@@ -351,7 +366,7 @@ class _VideoEditorState extends State<VideoEditor> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                _formatDuration(_controller.value.position),
+                _formatDuration(position),
                 style: const TextStyle(color: Colors.white70),
               ),
               Text(
@@ -374,7 +389,7 @@ class _VideoEditorState extends State<VideoEditor> {
                     painter: ChapterMarkerPainter(
                       chapters: _videoEdit!.chapters,
                       duration: totalMillis,
-                      currentPosition: _controller.value.position.inMilliseconds.toDouble(),
+                      currentPosition: position.inMilliseconds.toDouble(),
                     ),
                   ),
                 ),
@@ -389,12 +404,12 @@ class _VideoEditorState extends State<VideoEditor> {
                   overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
                 ),
                 child: Slider(
-                  value: _controller.value.position.inMilliseconds.toDouble(),
+                  value: position.inMilliseconds.toDouble(),
                   min: 0.0,
                   max: totalMillis,
                   onChanged: (value) {
-                    final Duration newPosition = Duration(milliseconds: value.round());
-                    _controller.seekTo(newPosition);
+                    final newPosition = Duration(milliseconds: value.round());
+                    _player.seek(newPosition);
                   },
                 ),
               ),
@@ -410,7 +425,7 @@ class _VideoEditorState extends State<VideoEditor> {
 
   List<Widget> _buildChapterLabels(double totalDuration) {
     const double showThreshold = 0.05; // Show label when within 5% of chapter
-    final currentPos = _controller.value.position.inMilliseconds.toDouble();
+    final currentPos = _player.state.position.inMilliseconds.toDouble();
     
     return _videoEdit!.chapters.map((chapter) {
       final chapterPos = chapter.timestamp * 1000;
@@ -456,11 +471,11 @@ class _VideoEditorState extends State<VideoEditor> {
             return Column(
               children: [
                 AspectRatio(
-                  aspectRatio: _controller.value.aspectRatio,
+                  aspectRatio: 16/9,  // Default aspect ratio
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
-                      VideoPlayer(_controller),
+                      mk.Video(controller: _controller),
                       if (_videoEdit != null)
                         ..._videoEdit!.textOverlays
                             .where((overlay) =>
@@ -470,7 +485,7 @@ class _VideoEditorState extends State<VideoEditor> {
                               (overlay) => Positioned(
                                 left: 0,
                                 right: 0,
-                                bottom: 50, // Add some padding from bottom
+                                bottom: 50,
                                 child: Center(
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -497,8 +512,8 @@ class _VideoEditorState extends State<VideoEditor> {
                           setState(() {
                             _isPlaying = !_isPlaying;
                             _isPlaying
-                                ? _controller.play()
-                                : _controller.pause();
+                                ? _player.play()
+                                : _player.pause();
                           });
                         },
                       ),
@@ -517,8 +532,8 @@ class _VideoEditorState extends State<VideoEditor> {
                           setState(() {
                             _isPlaying = !_isPlaying;
                             _isPlaying
-                                ? _controller.play()
-                                : _controller.pause();
+                                ? _player.play()
+                                : _player.pause();
                           });
                         },
                       ),
@@ -628,7 +643,7 @@ class _VideoEditorState extends State<VideoEditor> {
                                             },
                                           ),
                                           onTap: () {
-                                            _controller.seekTo(
+                                            _player.seek(
                                               Duration(
                                                 milliseconds: (chapter.timestamp * 1000).round(),
                                               ),
@@ -749,7 +764,7 @@ class _VideoEditorState extends State<VideoEditor> {
                                             ],
                                           ),
                                           onTap: () {
-                                            _controller.seekTo(
+                                            _player.seek(
                                               Duration(
                                                 milliseconds: (overlay.startTime * 1000).round(),
                                               ),
@@ -777,7 +792,7 @@ class _VideoEditorState extends State<VideoEditor> {
 
   @override
   void dispose() {
-    _controller.dispose();
+    _player.dispose();
     super.dispose();
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import '../../video/services/video_upload_service.dart';
 import '../widgets/video_metadata_dialog.dart';
 
@@ -17,7 +18,8 @@ class VideoPreviewScreen extends StatefulWidget {
 }
 
 class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
-  late VideoPlayerController _controller;
+  late Player _player;
+  late VideoController _controller;
   final VideoUploadService _uploadService = VideoUploadService();
   bool _isPlaying = false;
   bool _isUploading = false;
@@ -31,10 +33,11 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
   }
 
   Future<void> _initializeVideoPlayer() async {
-    _controller = VideoPlayerController.file(File(widget.videoPath));
-    await _controller.initialize();
-    await _controller.setLooping(true);
-    await _controller.play();
+    _player = Player();
+    _controller = VideoController(_player);
+    await _player.open(Media('file://${widget.videoPath}'));
+    await _player.setPlaylistMode(PlaylistMode.loop);
+    await _player.play();
     setState(() {
       _isPlaying = true;
     });
@@ -43,7 +46,7 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
   void _togglePlayPause() {
     setState(() {
       _isPlaying = !_isPlaying;
-      _isPlaying ? _controller.play() : _controller.pause();
+      _isPlaying ? _player.play() : _player.pause();
     });
   }
 
@@ -88,7 +91,7 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
 
     try {
       // Pause video during upload
-      await _controller.pause();
+      await _player.pause();
       
       // Track when the upload is complete
       bool uploadFinished = false;
@@ -158,9 +161,9 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
   @override
   void dispose() {
     try {
-      _controller.dispose();
+      _player.dispose();
     } catch (e) {
-      print('Error disposing video controller: $e');
+      print('Error disposing video player: $e');
     }
     super.dispose();
   }
@@ -175,8 +178,8 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
             // Video Preview
             Center(
               child: AspectRatio(
-                aspectRatio: _controller.value.aspectRatio,
-                child: VideoPlayer(_controller),
+                aspectRatio: 16 / 9, // Default aspect ratio, will adjust to video
+                child: Video(controller: _controller),
               ),
             ),
 

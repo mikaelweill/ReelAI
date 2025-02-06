@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart' as mk;
 import 'package:visibility_detector/visibility_detector.dart';
 import '../services/video_feed_service.dart';
 import '../../studio/models/video_edit.dart';
@@ -7,7 +8,8 @@ import 'video_chapter_list.dart';
 
 class VideoCard extends StatefulWidget {
   final Video video;
-  final VideoPlayerController controller;
+  final mk.VideoController controller;
+  final Player player;
   final VoidCallback? onDelete;
   final bool showPrivacyIndicator;
   final Function(bool)? onVisibilityChanged;
@@ -16,6 +18,7 @@ class VideoCard extends StatefulWidget {
     super.key,
     required this.video,
     required this.controller,
+    required this.player,
     this.onDelete,
     this.showPrivacyIndicator = false,
     this.onVisibilityChanged,
@@ -36,24 +39,25 @@ class _VideoCardState extends State<VideoCard> {
   void initState() {
     super.initState();
     _loadVideoEdit();
-    widget.controller.addListener(_videoListener);
+    _setupPositionListener();
+  }
+
+  void _setupPositionListener() {
+    widget.player.stream.position.listen((position) {
+      if (mounted) {
+        setState(() {
+          _currentPosition = position.inMilliseconds / 1000;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
-    widget.controller.removeListener(_videoListener);
     if (_isVisible) {
-      widget.controller.pause();
+      widget.player.pause();
     }
     super.dispose();
-  }
-
-  void _videoListener() {
-    if (mounted) {
-      setState(() {
-        _currentPosition = widget.controller.value.position.inMilliseconds / 1000;
-      });
-    }
   }
 
   Future<void> _loadVideoEdit() async {
@@ -61,7 +65,6 @@ class _VideoCardState extends State<VideoCard> {
       if (mounted && videoEdit?.chapters.isNotEmpty == true) {
         setState(() {
           _videoEdit = videoEdit;
-          // Keep chapter list collapsed by default
           _isChapterListExpanded = false;
         });
       }
@@ -132,9 +135,9 @@ class _VideoCardState extends State<VideoCard> {
         color: Colors.black,
         child: Column(
           children: [
-            // Title section - fixed height or Expanded with flex:2
+            // Title section
             Expanded(
-              flex: 2,  // 20% of space
+              flex: 2,
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -211,33 +214,26 @@ class _VideoCardState extends State<VideoCard> {
               ),
             ),
 
-            // Video section - Expanded with largest flex
+            // Video section
             Expanded(
-              flex: 6,  // 60% of space
+              flex: 6,
               child: Center(
                 child: AspectRatio(
                   aspectRatio: widget.video.aspectRatio,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      if (!widget.controller.value.isInitialized)
+                      if (!widget.player.state.playing)
                         Container(
                           color: Colors.black87,
                           child: const Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.video_library, color: Colors.white70, size: 48),
-                                SizedBox(height: 8),
-                                Text(
-                                  'Loading Video...',
-                                  style: TextStyle(color: Colors.white70),
-                                ),
-                              ],
-                            ),
+                            child: Icon(Icons.play_arrow, color: Colors.white70, size: 64),
                           ),
                         ),
-                      VideoPlayer(widget.controller),
+                      mk.Video(
+                        controller: widget.controller,
+                        controls: null,
+                      ),
                       if (_videoEdit != null)
                         ..._videoEdit!.textOverlays
                             .where((overlay) =>
@@ -247,7 +243,7 @@ class _VideoCardState extends State<VideoCard> {
                               (overlay) => Positioned(
                                 left: 0,
                                 right: 0,
-                                bottom: 50, // Add some padding from bottom
+                                bottom: 50,
                                 child: Center(
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -269,31 +265,39 @@ class _VideoCardState extends State<VideoCard> {
                                 ),
                               ),
                             ),
+                      GestureDetector(
+                        onTap: () {
+                          if (widget.player.state.playing) {
+                            widget.player.pause();
+                          } else {
+                            widget.player.play();
+                          }
+                        },
+                      ),
                     ],
                   ),
                 ),
               ),
             ),
 
-            // Chapters section - fixed height or Expanded with flex:2
-            Expanded(
-              flex: 2,  // 20% of space
-              child: _videoEdit?.chapters.isNotEmpty == true
-                ? VideoChapterList(
-                    chapters: _videoEdit!.chapters,
-                    currentPosition: widget.controller.value.position.inMilliseconds / 1000,
-                    onSeek: (timestamp) {
-                      widget.controller.seekTo(Duration(milliseconds: (timestamp * 1000).round()));
-                    },
-                    isExpanded: _isChapterListExpanded,
-                    onToggleExpanded: () {
-                      setState(() {
-                        _isChapterListExpanded = !_isChapterListExpanded;
-                      });
-                    },
-                  )
-                : const SizedBox.shrink(),
-            ),
+            // Chapters section
+            if (_videoEdit?.chapters.isNotEmpty == true)
+              Expanded(
+                flex: 2,
+                child: VideoChapterList(
+                  chapters: _videoEdit!.chapters,
+                  currentPosition: _currentPosition,
+                  onSeek: (timestamp) {
+                    widget.player.seek(Duration(milliseconds: (timestamp * 1000).round()));
+                  },
+                  isExpanded: _isChapterListExpanded,
+                  onToggleExpanded: () {
+                    setState(() {
+                      _isChapterListExpanded = !_isChapterListExpanded;
+                    });
+                  },
+                ),
+              ),
           ],
         ),
       ),

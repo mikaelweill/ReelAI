@@ -37,6 +37,18 @@ android {
         targetSdkVersion 34
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        
+        // Add this for media_kit
+        ndk {
+            abiFilters "armeabi-v7a", "arm64-v8a", "x86_64"
+        }
+    }
+
+    // Add packagingOptions
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging true
+        }
     }
 
     signingConfigs {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart' as mk;
 import '../services/video_feed_service.dart';
 import 'video_card.dart';
 
@@ -24,7 +25,8 @@ class VideoFeed extends StatefulWidget {
 }
 
 class _VideoFeedState extends State<VideoFeed> {
-  final Map<String, VideoPlayerController> _controllers = {};
+  final Map<String, Player> _players = {};
+  final Map<String, mk.VideoController> _controllers = {};
   static const int _maxControllers = 3;
   String? _currentlyPlayingUrl;
   final Map<String, bool> _bufferingStates = {};
@@ -33,20 +35,20 @@ class _VideoFeedState extends State<VideoFeed> {
   @override
   void dispose() {
     _pageController.dispose();
-    for (var controller in _controllers.values) {
-      controller.dispose();
+    for (var player in _players.values) {
+      player.dispose();
     }
+    _players.clear();
     _controllers.clear();
     super.dispose();
   }
 
   Future<void> _disposeController(String videoUrl) async {
     try {
+      final player = _players.remove(videoUrl);
       final controller = _controllers.remove(videoUrl);
-      if (controller != null) {
-        controller.removeListener(() => _onVideoControllerUpdate(videoUrl));
-        await controller.pause();
-        await controller.dispose();
+      if (player != null) {
+        await player.dispose();
       }
       if (_currentlyPlayingUrl == videoUrl) {
         _currentlyPlayingUrl = null;
@@ -57,7 +59,7 @@ class _VideoFeedState extends State<VideoFeed> {
     }
   }
 
-  Future<VideoPlayerController?> _getController(String videoUrl) async {
+  Future<mk.VideoController?> _getController(String videoUrl) async {
     try {
       if (_controllers.containsKey(videoUrl)) {
         return _controllers[videoUrl];
@@ -70,27 +72,42 @@ class _VideoFeedState extends State<VideoFeed> {
       }
 
       print('Initializing video controller for: $videoUrl');
-      final controller = VideoPlayerController.networkUrl(
-        Uri.parse(videoUrl),
-        videoPlayerOptions: VideoPlayerOptions(
-          mixWithOthers: false,
-          allowBackgroundPlayback: false,
+      
+      // Create a new player instance
+      final player = Player(
+        configuration: const PlayerConfiguration(
+          bufferSize: 32 * 1024 * 1024, // 32MB buffer
         ),
       );
       
-      // Add buffering listener
-      controller.addListener(() => _onVideoControllerUpdate(videoUrl));
+      // Create the video controller
+      final controller = mk.VideoController(player);
+      
       _bufferingStates[videoUrl] = true;
       
       try {
-        await controller.initialize();
-        await controller.setLooping(true);
+        // Open the media source
+        await player.open(Media(videoUrl));
+        await player.setPlaylistMode(PlaylistMode.loop);
+        
+        // Store references
+        _players[videoUrl] = player;
         _controllers[videoUrl] = controller;
+        
+        // Add state listener
+        player.stream.buffering.listen((buffering) {
+          if (mounted) {
+            setState(() {
+              _bufferingStates[videoUrl] = buffering;
+            });
+          }
+        });
+        
         print('Successfully initialized video: $videoUrl');
         return controller;
       } catch (initError) {
         print('Error initializing specific video: $initError');
-        await controller.dispose();
+        await player.dispose();
         return null;
       }
     } catch (e) {
@@ -99,18 +116,27 @@ class _VideoFeedState extends State<VideoFeed> {
     }
   }
 
-  void _onVideoControllerUpdate(String videoUrl) {
-    final controller = _controllers[videoUrl];
-    if (controller == null) return;
+  void onVideoVisibilityChanged(String videoUrl, bool isVisible) async {
+    if (!mounted) return;
 
-    final buffered = controller.value.buffered;
-    final isBuffering = buffered.isEmpty || 
-        buffered.first.end < controller.value.position + const Duration(seconds: 1);
-    
-    if (_bufferingStates[videoUrl] != isBuffering && mounted) {
-      setState(() {
-        _bufferingStates[videoUrl] = isBuffering;
-      });
+    final player = _players[videoUrl];
+    if (player == null) return;
+
+    if (isVisible) {
+      // Pause any currently playing video
+      if (_currentlyPlayingUrl != null && _currentlyPlayingUrl != videoUrl) {
+        final currentPlayer = _players[_currentlyPlayingUrl];
+        if (currentPlayer != null) {
+          await currentPlayer.pause();
+        }
+      }
+      // Play the new video
+      _currentlyPlayingUrl = videoUrl;
+      await player.play();
+    } else if (_currentlyPlayingUrl == videoUrl) {
+      // Pause if this video was playing and is now hidden
+      await player.pause();
+      _currentlyPlayingUrl = null;
     }
   }
 
@@ -140,30 +166,6 @@ class _VideoFeedState extends State<VideoFeed> {
         ),
       ),
     );
-  }
-
-  void onVideoVisibilityChanged(String videoUrl, bool isVisible) async {
-    if (!mounted) return;
-
-    final controller = _controllers[videoUrl];
-    if (controller == null) return;
-
-    if (isVisible) {
-      // Pause any currently playing video
-      if (_currentlyPlayingUrl != null && _currentlyPlayingUrl != videoUrl) {
-        final currentController = _controllers[_currentlyPlayingUrl];
-        if (currentController != null) {
-          await currentController.pause();
-        }
-      }
-      // Play the new video
-      _currentlyPlayingUrl = videoUrl;
-      await controller.play();
-    } else if (_currentlyPlayingUrl == videoUrl) {
-      // Pause if this video was playing and is now hidden
-      await controller.pause();
-      _currentlyPlayingUrl = null;
-    }
   }
 
   @override
@@ -204,7 +206,7 @@ class _VideoFeedState extends State<VideoFeed> {
             itemBuilder: (context, index) {
               final video = videos[index];
               
-              return FutureBuilder<VideoPlayerController?>(
+              return FutureBuilder<mk.VideoController?>(
                 future: _getController(video.videoUrl),
                 builder: (context, controllerSnapshot) {
                   if (!controllerSnapshot.hasData || controllerSnapshot.data == null) {
@@ -220,9 +222,11 @@ class _VideoFeedState extends State<VideoFeed> {
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
+                        mk.Video(controller: controllerSnapshot.data!),
                         VideoCard(
                           video: video,
                           controller: controllerSnapshot.data!,
+                          player: _players[video.videoUrl]!,
                           onVisibilityChanged: (isVisible) => 
                               onVideoVisibilityChanged(video.videoUrl, isVisible),
                           showPrivacyIndicator: widget.showPrivacyControls,
