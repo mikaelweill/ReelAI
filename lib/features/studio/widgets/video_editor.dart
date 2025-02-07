@@ -814,6 +814,26 @@ class _VideoEditorState extends State<VideoEditor> {
                     alignment: Alignment.center,
                     children: [
                       mk.Video(controller: _controller),
+                      // Drawing display layer (always visible)
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: SimpleDrawingPainter(
+                            strokes: _strokes,
+                            currentStroke: _currentStroke.isNotEmpty
+                                ? DrawingStroke(
+                                    id: 'temp',
+                                    points: _currentStroke,
+                                    color: _currentColor,
+                                    width: _currentStrokeWidth,
+                                    startTime: _currentPosition,
+                                    endTime: _currentPosition + 3.0,
+                                  )
+                                : null,
+                            currentTime: _currentPosition,
+                          ),
+                          size: Size.infinite,
+                        ),
+                      ),
                       if (_videoEdit != null)
                         ..._videoEdit!.textOverlays
                             .where((overlay) =>
@@ -845,7 +865,7 @@ class _VideoEditorState extends State<VideoEditor> {
                                 ),
                               ),
                             ),
-                      // Add drawing layer
+                      // Drawing input layer (only in drawing mode)
                       if (_isDrawingMode)
                         Positioned.fill(
                           child: GestureDetector(
@@ -863,26 +883,16 @@ class _VideoEditorState extends State<VideoEditor> {
                               setState(() {
                                 // Add completed stroke to strokes list
                                 _strokes.add(DrawingStroke(
+                                  id: _uuid.v4(),
                                   points: List.from(_currentStroke),
                                   color: _currentColor,
                                   width: _currentStrokeWidth,
+                                  startTime: _currentPosition,
+                                  endTime: _currentPosition + 3.0, // Default 3 second duration
                                 ));
                                 _currentStroke = [];
                               });
                             },
-                            child: CustomPaint(
-                              painter: SimpleDrawingPainter(
-                                strokes: _strokes,
-                                currentStroke: _currentStroke.isNotEmpty
-                                    ? DrawingStroke(
-                                        points: _currentStroke,
-                                        color: _currentColor,
-                                        width: _currentStrokeWidth,
-                                      )
-                                    : null,
-                              ),
-                              size: Size.infinite,
-                            ),
                           ),
                         ),
                       GestureDetector(
