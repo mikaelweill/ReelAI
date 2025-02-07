@@ -84,6 +84,17 @@ class VideoUploadService {
       });
 
       print('Upload complete. Video ID: ${docRef.id}');
+
+      // Clean up compressed file
+      try {
+        if (compressedFile != null && await compressedFile.exists()) {
+          await compressedFile.delete();
+          print('Cleaned up compressed file');
+        }
+      } catch (e) {
+        print('Warning: Could not clean up compressed file: $e');
+      }
+
       return docRef.id;
     } catch (e) {
       print('Error in uploadVideo: $e');
@@ -91,15 +102,6 @@ class VideoUploadService {
     } finally {
       // Clean up compression cache
       await _compressionService.dispose();
-      
-      // Delete the compressed file if it exists
-      try {
-        if (compressedFile != null && await compressedFile.exists()) {
-          await compressedFile.delete();
-        }
-      } catch (e) {
-        print('Error cleaning up compressed file: $e');
-      }
     }
   }
 
