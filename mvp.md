@@ -31,9 +31,22 @@
 - Privacy status persistence
 - Filtered video feeds based on privacy status
 
+### 5. Freeform Drawing Overlay ✓
+- Pen tool with customizable:
+  - Colors
+  - Stroke width
+  - Opacity
+- Timestamp-based drawings
+- Drawing playback sync with video
+- Erase/undo functionality
+- Drawing layer management
+- Drawing preview in list
+- Edit drawing durations
+- Drawings visible in all views (studio, feed, my videos)
+
 ## Planned Features (In Development)
 
-### 5. Intro/Outro Templates
+### 6. Intro/Outro Templates
 **Description**: Allow users to create and manage reusable intro/outro clips that can be easily appended to any video.
 
 **Key Features**:
@@ -51,31 +64,34 @@
 - Transition handling
 - Template metadata management
 
-### 6. Freeform Drawing Overlay
-**Description**: Provide a pen tool for creating freeform drawings and annotations that appear at specific timestamps in the video.
+### 7. Enhanced Drawing Features
+**Description**: Additional features to make drawings more powerful and versatile.
 
 **Key Features**:
-- Pen tool with customizable:
-  - Colors
-  - Stroke width
-  - Opacity
-- Timestamp-based drawings
-- Drawing playback sync with video
-- Erase/undo functionality
-- Drawing layer management
-- Export with drawings embedded
+- Shape tools (circles, rectangles, arrows)
+- Text annotations with drawings
+- Drawing templates/presets
+- Multi-color strokes
+- Stroke effects (glow, shadow, etc.)
+- Drawing groups/layers
+- Copy/paste drawings between timestamps
 
-**Technical Considerations**:
-- Canvas implementation for drawing
-- Drawing data structure and storage
-- Performance optimization for playback
-- Vector graphics handling
-- Drawing state management
+### 8. Interactive Overlays
+**Description**: Add clickable elements and interactive features to videos.
+
+**Key Features**:
+- Clickable hotspots/buttons
+- Pop-up information cards
+- Links to other videos/content
+- Interactive quizzes/polls
+- Custom thumbnail selection
+- Picture-in-picture support
+- Reaction overlays
 
 ## Implementation Priority
-1. Complete and polish existing features
-2. Implement Intro/Outro Templates
-3. Implement Freeform Drawing Overlay
+1. Enhanced Drawing Features (build upon existing drawing system)
+2. Intro/Outro Templates (most requested feature)
+3. Interactive Overlays (adds engagement features)
 
 ## Success Criteria
 - All features work consistently across studio and feed views

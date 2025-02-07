@@ -8,6 +8,7 @@ import '../models/video_edit.dart';
 import 'drawing_painter.dart';
 import 'dart:async';
 import 'dart:math';
+import 'interactive/info_card_test_page.dart';
 
 class TrimRegionPainter extends CustomPainter {
   final double? trimStart;
@@ -1075,6 +1076,19 @@ class _VideoEditorState extends State<VideoEditor> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit Video'),
+        actions: [
+          // Temporary button for testing info card
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const InfoCardTestPage(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: FutureBuilder(
         future: _initializeVideoPlayerFuture,
@@ -1238,6 +1252,7 @@ class _VideoEditorState extends State<VideoEditor> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
+                      // Play/Pause
                       IconButton(
                         icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow),
                         onPressed: () {
@@ -1249,20 +1264,17 @@ class _VideoEditorState extends State<VideoEditor> {
                           });
                         },
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.text_fields),
-                        onPressed: () => _addTextOverlay(),
-                      ),
+                      // Chapters
                       IconButton(
                         icon: const Icon(Icons.bookmark_add),
                         onPressed: _addChapterMark,
                       ),
+                      // Closed Captions (Text Overlay)
                       IconButton(
-                        icon: const Icon(Icons.content_cut),
-                        color: _isTrimMode ? Colors.blue : null,
-                        onPressed: _toggleTrimMode,
+                        icon: const Icon(Icons.text_fields),
+                        onPressed: () => _addTextOverlay(),
                       ),
-                      // Add drawing mode toggle
+                      // Drawing
                       IconButton(
                         icon: const Icon(Icons.brush),
                         color: _isDrawingMode ? Colors.blue : null,
@@ -1274,6 +1286,12 @@ class _VideoEditorState extends State<VideoEditor> {
                             }
                           });
                         },
+                      ),
+                      // Trim
+                      IconButton(
+                        icon: const Icon(Icons.content_cut),
+                        color: _isTrimMode ? Colors.blue : null,
+                        onPressed: _toggleTrimMode,
                       ),
                     ],
                   ),
