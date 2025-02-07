@@ -98,6 +98,9 @@ class _VideoEditorState extends State<VideoEditor> {
   Color _currentColor = Colors.white;
   double _currentStrokeWidth = 3.0;
 
+  // Add info card list state
+  bool _isInfoCardListExpanded = false;
+
   @override
   void initState() {
     super.initState();
@@ -113,6 +116,7 @@ class _VideoEditorState extends State<VideoEditor> {
       chapters: [],
       captions: [],
       drawings: [],  // Initialize empty drawings list
+      interactiveOverlays: [], // Initialize empty interactive overlays
       lastModified: DateTime.now(),
     );
     // Then load any existing edits
@@ -202,6 +206,7 @@ class _VideoEditorState extends State<VideoEditor> {
             chapters: [],
             captions: [],
             drawings: [],  // Initialize empty drawings list
+            interactiveOverlays: [], // Initialize empty interactive overlays
             lastModified: DateTime.now(),
           );
           _strokes = [];  // Clear strokes
@@ -217,6 +222,7 @@ class _VideoEditorState extends State<VideoEditor> {
           chapters: [],
           captions: [],
           drawings: [],  // Initialize empty drawings list
+          interactiveOverlays: [], // Initialize empty interactive overlays
           lastModified: DateTime.now(),
         );
         _strokes = [];  // Clear strokes
@@ -263,6 +269,7 @@ class _VideoEditorState extends State<VideoEditor> {
         chapters: _videoEdit!.chapters,
         captions: _videoEdit!.captions,
         drawings: _strokes,  // Add drawings to save
+        interactiveOverlays: _videoEdit!.interactiveOverlays,  // Add this line
         lastModified: DateTime.now(),
         trimStartTime: _videoEdit!.trimStartTime,  // Include trim start
         trimEndTime: _videoEdit!.trimEndTime,      // Include trim end
@@ -297,7 +304,11 @@ class _VideoEditorState extends State<VideoEditor> {
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Changes saved successfully')),
+          const SnackBar(
+            content: Text('Changes saved successfully'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } catch (e, stackTrace) {
@@ -315,7 +326,8 @@ class _VideoEditorState extends State<VideoEditor> {
           SnackBar(
             content: Text('Error saving changes: $e'),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -548,6 +560,7 @@ class _VideoEditorState extends State<VideoEditor> {
                     chapters: _videoEdit!.chapters,
                     captions: _videoEdit!.captions,
                     drawings: _strokes,
+                    interactiveOverlays: _videoEdit!.interactiveOverlays,
                     lastModified: DateTime.now(),
                     trimStartTime: _tempTrimStart,
                     trimEndTime: _tempTrimEnd,
@@ -736,6 +749,7 @@ class _VideoEditorState extends State<VideoEditor> {
                         chapters: _videoEdit!.chapters,
                         captions: _videoEdit!.captions,
                         drawings: _strokes,
+                        interactiveOverlays: _videoEdit!.interactiveOverlays,
                         lastModified: DateTime.now(),
                         trimStartTime: _tempTrimStart,
                         trimEndTime: _tempTrimEnd,
@@ -1074,6 +1088,18 @@ class _VideoEditorState extends State<VideoEditor> {
   }
 
   void _addInfoCard() {
+    // Check if a card already exists
+    if (_videoEdit?.interactiveOverlays.isNotEmpty == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Only one info card is allowed per video. Please edit or delete the existing card.'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     String title = '';
     String description = '';
     List<String> bulletPoints = [];
@@ -1105,8 +1131,6 @@ class _VideoEditorState extends State<VideoEditor> {
                   maxLines: 3,
                   onChanged: (value) => description = value,
                 ),
-                const SizedBox(height: 16),
-                // Bullet points section will be added here
                 const SizedBox(height: 16),
                 TextField(
                   decoration: const InputDecoration(
@@ -1141,9 +1165,9 @@ class _VideoEditorState extends State<VideoEditor> {
                     bulletPoints: bulletPoints,
                     linkUrl: linkUrl,
                     linkText: linkText,
-                    startTime: 0, // Global card, always visible
-                    endTime: double.infinity,
-                    position: const Offset(0, 0), // Not used for global cards
+                    startTime: 0,  // Always 0 for global cards
+                    endTime: double.infinity,  // Always infinity for global cards
+                    position: const Offset(0, 0),  // Not used for global cards
                   );
                   
                   setState(() {
@@ -1160,6 +1184,265 @@ class _VideoEditorState extends State<VideoEditor> {
           ],
         );
       },
+    );
+  }
+
+  void _editInfoCard(InteractiveOverlay existingCard) {
+    String title = existingCard.title;
+    String description = existingCard.description;
+    List<String> bulletPoints = List.from(existingCard.bulletPoints);
+    String? linkUrl = existingCard.linkUrl;
+    String? linkText = existingCard.linkText;
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit Info Card'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: TextEditingController(text: title)
+                    ..selection = TextSelection.fromPosition(
+                      TextPosition(offset: title.length),
+                    ),
+                  decoration: const InputDecoration(
+                    labelText: 'Title',
+                    hintText: 'Enter card title',
+                  ),
+                  onChanged: (value) => title = value,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: TextEditingController(text: description)
+                    ..selection = TextSelection.fromPosition(
+                      TextPosition(offset: description.length),
+                    ),
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    hintText: 'Enter description',
+                  ),
+                  maxLines: 3,
+                  onChanged: (value) => description = value,
+                ),
+                const SizedBox(height: 16),
+                // Bullet points section will be added here
+                const SizedBox(height: 16),
+                TextField(
+                  controller: TextEditingController(text: linkUrl ?? '')
+                    ..selection = TextSelection.fromPosition(
+                      TextPosition(offset: linkUrl?.length ?? 0),
+                    ),
+                  decoration: const InputDecoration(
+                    labelText: 'Link URL (optional)',
+                    hintText: 'Enter URL',
+                  ),
+                  onChanged: (value) => linkUrl = value.isEmpty ? null : value,
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: TextEditingController(text: linkText ?? '')
+                    ..selection = TextSelection.fromPosition(
+                      TextPosition(offset: linkText?.length ?? 0),
+                    ),
+                  decoration: const InputDecoration(
+                    labelText: 'Link Text (optional)',
+                    hintText: 'Enter link text',
+                  ),
+                  onChanged: (value) => linkText = value.isEmpty ? null : value,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                if (title.isNotEmpty && description.isNotEmpty) {
+                  final updatedCard = InteractiveOverlay(
+                    id: existingCard.id,
+                    title: title,
+                    description: description,
+                    bulletPoints: bulletPoints,
+                    linkUrl: linkUrl,
+                    linkText: linkText,
+                    startTime: existingCard.startTime,
+                    endTime: existingCard.endTime,
+                    position: existingCard.position,
+                    dotColor: existingCard.dotColor,
+                    dotSize: existingCard.dotSize,
+                  );
+                  
+                  setState(() {
+                    final index = _videoEdit!.interactiveOverlays.indexWhere(
+                      (card) => card.id == existingCard.id
+                    );
+                    if (index != -1) {
+                      _videoEdit!.interactiveOverlays[index] = updatedCard;
+                    }
+                  });
+                  
+                  Navigator.pop(context);
+                  await _saveVideoEdit();
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _deleteInfoCard(InteractiveOverlay card) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Delete Info Card'),
+          content: Text('Are you sure you want to delete "${card.title}"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                setState(() {
+                  _videoEdit!.interactiveOverlays.removeWhere(
+                    (overlay) => overlay.id == card.id
+                  );
+                });
+                Navigator.pop(context);
+                await _saveVideoEdit();
+              },
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildTextOverlaysList() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Text Overlays header with expand/collapse
+        GestureDetector(
+          onTap: () => setState(() {
+            _isTextOverlayListExpanded = !_isTextOverlayListExpanded;
+          }),
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              children: [
+                const Icon(Icons.text_fields, size: 16, color: Colors.white70),
+                const SizedBox(width: 8),
+                Text(
+                  'Text Overlays (${_videoEdit!.textOverlays.length})',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  _isTextOverlayListExpanded ? Icons.expand_less : Icons.expand_more,
+                  color: Colors.white70,
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Text Overlays list (collapsible)
+        if (_isTextOverlayListExpanded)
+          Container(
+            constraints: const BoxConstraints(maxHeight: 200),
+            child: ListView.builder(
+              shrinkWrap: true,
+              physics: const ClampingScrollPhysics(),
+              itemCount: _videoEdit!.textOverlays.length,
+              itemBuilder: (context, index) {
+                final sortedOverlays = _videoEdit!.textOverlays.toList()
+                  ..sort((a, b) => a.startTime.compareTo(b.startTime));
+                
+                final overlay = sortedOverlays[index];
+                final isActive = _currentPosition >= overlay.startTime && 
+                               _currentPosition <= overlay.endTime;
+                
+                return ListTile(
+                  leading: const Icon(Icons.text_fields),
+                  title: Text(
+                    overlay.text,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: isActive ? Colors.white : Colors.white70,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${overlay.startTime.toStringAsFixed(1)}s - ${overlay.endTime.toStringAsFixed(1)}s',
+                    style: TextStyle(
+                      color: isActive ? Colors.white70 : Colors.white38,
+                    ),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.white70),
+                        onPressed: () => _addTextOverlay(existingOverlay: overlay),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Delete Text Overlay?'),
+                              content: Text('Are you sure you want to delete this text overlay?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _videoEdit!.textOverlays.remove(overlay);
+                                    });
+                                    _saveVideoEdit();
+                                    Navigator.pop(context);
+                                  },
+                                  child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  onTap: () {
+                    _player.seek(
+                      Duration(
+                        milliseconds: (overlay.startTime * 1000).round(),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+      ],
     );
   }
 
@@ -1537,23 +1820,27 @@ class _VideoEditorState extends State<VideoEditor> {
                           
                           // Text Overlays section
                           if (_videoEdit!.textOverlays.isNotEmpty)
+                            _buildTextOverlaysList(),
+                            
+                          // Info Cards section
+                          if (_videoEdit!.interactiveOverlays.isNotEmpty)
                             Column(
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Text overlay header with expand/collapse
+                                // Info Cards header with expand/collapse
                                 GestureDetector(
                                   onTap: () => setState(() {
-                                    _isTextOverlayListExpanded = !_isTextOverlayListExpanded;
+                                    _isInfoCardListExpanded = !_isInfoCardListExpanded;
                                   }),
                                   child: Padding(
                                     padding: const EdgeInsets.all(8.0),
                                     child: Row(
                                       children: [
-                                        const Icon(Icons.text_fields, size: 16, color: Colors.white70),
+                                        const Icon(Icons.info_outline, size: 16, color: Colors.white70),
                                         const SizedBox(width: 8),
                                         Text(
-                                          'Text Overlays (${_videoEdit!.textOverlays.length})',
+                                          'Info Cards (${_videoEdit!.interactiveOverlays.length})',
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 16,
@@ -1562,93 +1849,53 @@ class _VideoEditorState extends State<VideoEditor> {
                                         ),
                                         const Spacer(),
                                         Icon(
-                                          _isTextOverlayListExpanded ? Icons.expand_less : Icons.expand_more,
+                                          _isInfoCardListExpanded ? Icons.expand_less : Icons.expand_more,
                                           color: Colors.white70,
                                         ),
                                       ],
                                     ),
                                   ),
                                 ),
-                                // Text overlay list (collapsible)
-                                if (_isTextOverlayListExpanded)
+                                // Info Cards list (collapsible)
+                                if (_isInfoCardListExpanded)
                                   Container(
                                     constraints: const BoxConstraints(maxHeight: 200),
                                     child: ListView.builder(
                                       shrinkWrap: true,
                                       physics: const ClampingScrollPhysics(),
-                                      itemCount: _videoEdit!.textOverlays.length,
+                                      itemCount: _videoEdit!.interactiveOverlays.length,
                                       itemBuilder: (context, index) {
-                                        final sortedOverlays = _videoEdit!.textOverlays.toList()
-                                          ..sort((a, b) => a.startTime.compareTo(b.startTime));
-                                        
-                                        _videoEdit!.textOverlays.clear();
-                                        _videoEdit!.textOverlays.addAll(sortedOverlays);
-                                        
-                                        final overlay = _videoEdit!.textOverlays[index];
-                                        final isActive = _currentPosition >= overlay.startTime && 
-                                                       _currentPosition <= overlay.endTime;
+                                        final overlay = _videoEdit!.interactiveOverlays[index];
                                         
                                         return ListTile(
-                                          leading: Icon(
-                                            Icons.text_fields,
-                                            color: isActive ? Colors.white : Colors.white38,
-                                          ),
+                                          leading: const Icon(Icons.info_outline),
                                           title: Text(
-                                            overlay.text,
-                                            style: TextStyle(
-                                              color: isActive ? Colors.white : Colors.white70,
-                                            ),
+                                            overlay.title,
+                                            style: const TextStyle(color: Colors.white),
                                           ),
                                           subtitle: Text(
-                                            '${overlay.startTime.toStringAsFixed(1)}s - ${overlay.endTime.toStringAsFixed(1)}s',
-                                            style: TextStyle(
-                                              color: isActive ? Colors.white70 : Colors.white38,
-                                            ),
+                                            overlay.description,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(color: Colors.white70),
                                           ),
                                           trailing: Row(
                                             mainAxisSize: MainAxisSize.min,
                                             children: [
                                               IconButton(
                                                 icon: const Icon(Icons.edit, color: Colors.white70),
-                                                onPressed: () => _addTextOverlay(existingOverlay: overlay),
+                                                onPressed: () {
+                                                  _editInfoCard(overlay);
+                                                },
                                               ),
                                               IconButton(
                                                 icon: const Icon(Icons.delete, color: Colors.red),
                                                 onPressed: () {
-                                                  showDialog(
-                                                    context: context,
-                                                    builder: (context) => AlertDialog(
-                                                      title: const Text('Delete Text Overlay?'),
-                                                      content: Text('Are you sure you want to delete "${overlay.text}"?'),
-                                                      actions: [
-                                                        TextButton(
-                                                          onPressed: () => Navigator.pop(context),
-                                                          child: const Text('Cancel'),
-                                                        ),
-                                                        TextButton(
-                                                          onPressed: () {
-                                                            setState(() {
-                                                              _videoEdit!.textOverlays.remove(overlay);
-                                                            });
-                                                            _saveVideoEdit();
-                                                            Navigator.pop(context);
-                                                          },
-                                                          child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  );
+                                                  _deleteInfoCard(overlay);
                                                 },
                                               ),
                                             ],
                                           ),
-                                          onTap: () {
-                                            _player.seek(
-                                              Duration(
-                                                milliseconds: (overlay.startTime * 1000).round(),
-                                              ),
-                                            );
-                                          },
                                         );
                                       },
                                     ),

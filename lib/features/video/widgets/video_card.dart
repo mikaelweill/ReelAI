@@ -145,6 +145,124 @@ class _VideoCardState extends State<VideoCard> {
     }
   }
 
+  void _showInfoCard() {
+    if (_videoEdit?.interactiveOverlays.isEmpty == true) return;
+    
+    final card = _videoEdit!.interactiveOverlays.first;
+    showDialog(
+      context: context,
+      barrierColor: Colors.black54,
+      builder: (context) => Theme(
+        data: Theme.of(context).copyWith(
+          dialogBackgroundColor: Colors.transparent,
+        ),
+        child: AlertDialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          contentPadding: EdgeInsets.zero,
+          content: Container(
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.75),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.white24,
+                width: 1,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        card.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        card.description,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 16,
+                        ),
+                      ),
+                      if (card.bulletPoints.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        ...card.bulletPoints.map((point) => Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('• ', style: TextStyle(color: Colors.white70, fontSize: 16)),
+                              Expanded(
+                                child: Text(
+                                  point,
+                                  style: const TextStyle(color: Colors.white70, fontSize: 16),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )),
+                      ],
+                      if (card.linkUrl != null && card.linkText != null) ...[
+                        const SizedBox(height: 16),
+                        TextButton(
+                          onPressed: () {
+                            // TODO: Implement URL launching
+                          },
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                card.linkText!,
+                                style: const TextStyle(color: Colors.blue),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(Icons.open_in_new, size: 16, color: Colors.blue),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Container(
+                  decoration: const BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: Colors.white24, width: 1),
+                    ),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Close', style: TextStyle(color: Colors.white70)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return VisibilityDetector(
@@ -193,6 +311,24 @@ class _VideoCardState extends State<VideoCard> {
                               child: Icon(
                                 widget.video.isPrivate ? Icons.lock : Icons.public,
                                 color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(width: 8),
+                        // Add info button
+                        if (_videoEdit?.interactiveOverlays.isNotEmpty == true)
+                          GestureDetector(
+                            onTap: _showInfoCard,
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.black45,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Icon(
+                                Icons.info_outline,
+                                color: Colors.blue,
                                 size: 20,
                               ),
                             ),
