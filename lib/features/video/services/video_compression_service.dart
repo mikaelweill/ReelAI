@@ -16,7 +16,7 @@ class VideoCompressionService {
   }) async {
     try {
       // Clean up any previous compression cache first
-      await VideoCompress.deleteAllCache();
+      // await VideoCompress.deleteAllCache();  // Removing this line
       
       // Subscribe to compression progress
       _subscription = VideoCompress.compressProgress$.subscribe((progress) {
@@ -69,7 +69,7 @@ class VideoCompressionService {
       // Clean up subscription and ensure we free up memory
       _subscription?.unsubscribe();
       _subscription = null;
-      await VideoCompress.deleteAllCache();
+      // await VideoCompress.deleteAllCache();  // Removing this problematic call
     }
   }
 
@@ -87,7 +87,7 @@ class VideoCompressionService {
     try {
       _subscription?.unsubscribe();
       _subscription = null;
-      await VideoCompress.deleteAllCache();
+      // await VideoCompress.deleteAllCache();  // Removing this problematic call
     } catch (e) {
       print('Error cleaning up compression cache: $e');
     }
