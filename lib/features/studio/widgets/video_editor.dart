@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../../models/video.dart' as model;
 import '../models/video_edit.dart';
 import 'drawing_painter.dart';
+import 'dart:async';
 
 class TrimRegionPainter extends CustomPainter {
   final double? trimStart;
@@ -77,6 +78,11 @@ class _VideoEditorState extends State<VideoEditor> {
   bool _isTextOverlayListExpanded = false;
   bool _isTrimMode = false;
   
+  // Add save indicator state
+  bool _isSaving = false;
+  bool _showSaveIndicator = false;
+  Timer? _saveIndicatorTimer;
+
   double? _tempTrimStart;
   double? _tempTrimEnd;
 
@@ -224,6 +230,11 @@ class _VideoEditorState extends State<VideoEditor> {
       return;
     }
 
+    setState(() {
+      _isSaving = true;
+      _showSaveIndicator = true;
+    });
+
     print('\n--- Starting Save Operation ---');
     print('Video details:');
     print('- ID: ${widget.video.id}');
@@ -266,6 +277,17 @@ class _VideoEditorState extends State<VideoEditor> {
       print('\nSave successful!');
       setState(() {
         _videoEdit = updatedEdit;
+        _isSaving = false;
+      });
+      
+      // Start timer to hide indicator
+      _saveIndicatorTimer?.cancel();
+      _saveIndicatorTimer = Timer(const Duration(seconds: 2), () {
+        if (mounted) {
+          setState(() {
+            _showSaveIndicator = false;
+          });
+        }
       });
       
       if (mounted) {
@@ -277,6 +299,11 @@ class _VideoEditorState extends State<VideoEditor> {
       print('\nError saving to Firestore:');
       print('- Error: $e');
       print('- Stack trace:\n$stackTrace');
+      
+      setState(() {
+        _isSaving = false;
+        _showSaveIndicator = false;
+      });
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -828,6 +855,55 @@ class _VideoEditorState extends State<VideoEditor> {
                     alignment: Alignment.center,
                     children: [
                       mk.Video(controller: _controller),
+                      // Add save indicator
+                      if (_showSaveIndicator)
+                        Positioned(
+                          top: 16,
+                          right: 16,
+                          child: AnimatedOpacity(
+                            opacity: _showSaveIndicator ? 1.0 : 0.0,
+                            duration: const Duration(milliseconds: 200),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.black87,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.white24),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 4,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (_isSaving)
+                                    const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  if (_isSaving)
+                                    const SizedBox(width: 8),
+                                  Text(
+                                    _isSaving ? 'Saving...' : 'Saved!',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
                       // Drawing display layer (always visible)
                       Positioned.fill(
                         child: CustomPaint(
@@ -893,7 +969,7 @@ class _VideoEditorState extends State<VideoEditor> {
                                 _currentStroke.add(details.localPosition);
                               });
                             },
-                            onPanEnd: (_) {
+                            onPanEnd: (_) async {
                               setState(() {
                                 // Add completed stroke to strokes list
                                 _strokes.add(DrawingStroke(
@@ -906,6 +982,7 @@ class _VideoEditorState extends State<VideoEditor> {
                                 ));
                                 _currentStroke = [];
                               });
+                              await _saveVideoEdit();  // Save after adding the stroke
                             },
                           ),
                         ),
@@ -1244,6 +1321,7 @@ class _VideoEditorState extends State<VideoEditor> {
 
   @override
   void dispose() {
+    _saveIndicatorTimer?.cancel();
     _player.dispose();
     super.dispose();
   }
