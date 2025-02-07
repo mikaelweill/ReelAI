@@ -83,6 +83,9 @@ class _VideoEditorState extends State<VideoEditor> {
   // Add drawing mode state
   bool _isDrawingMode = false;
   List<Offset> _currentStroke = [];
+  List<DrawingStroke> _strokes = [];
+  Color _currentColor = Colors.white;
+  double _currentStrokeWidth = 3.0;
 
   @override
   void initState() {
@@ -755,6 +758,44 @@ class _VideoEditorState extends State<VideoEditor> {
     });
   }
 
+  // Add color selection widget
+  Widget _buildColorPicker() {
+    return Container(
+      height: 50,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: [
+          for (final color in [
+            Colors.white,
+            Colors.red,
+            Colors.blue,
+            Colors.green,
+            Colors.yellow,
+            Colors.purple,
+          ])
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+              child: GestureDetector(
+                onTap: () => setState(() => _currentColor = color),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _currentColor == color ? Colors.white : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -820,11 +861,26 @@ class _VideoEditorState extends State<VideoEditor> {
                             },
                             onPanEnd: (_) {
                               setState(() {
+                                // Add completed stroke to strokes list
+                                _strokes.add(DrawingStroke(
+                                  points: List.from(_currentStroke),
+                                  color: _currentColor,
+                                  width: _currentStrokeWidth,
+                                ));
                                 _currentStroke = [];
                               });
                             },
                             child: CustomPaint(
-                              painter: SimpleDrawingPainter(_currentStroke),
+                              painter: SimpleDrawingPainter(
+                                strokes: _strokes,
+                                currentStroke: _currentStroke.isNotEmpty
+                                    ? DrawingStroke(
+                                        points: _currentStroke,
+                                        color: _currentColor,
+                                        width: _currentStrokeWidth,
+                                      )
+                                    : null,
+                              ),
                               size: Size.infinite,
                             ),
                           ),
@@ -888,6 +944,35 @@ class _VideoEditorState extends State<VideoEditor> {
                     ],
                   ),
                 ),
+                // Add color picker when in drawing mode
+                if (_isDrawingMode)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Column(
+                      children: [
+                        _buildColorPicker(),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            TextButton.icon(
+                              icon: const Icon(Icons.undo),
+                              label: const Text('Undo'),
+                              onPressed: _strokes.isNotEmpty
+                                ? () => setState(() => _strokes.removeLast())
+                                : null,
+                            ),
+                            TextButton.icon(
+                              icon: const Icon(Icons.clear_all),
+                              label: const Text('Clear All'),
+                              onPressed: _strokes.isNotEmpty
+                                ? () => setState(() => _strokes.clear())
+                                : null,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
                 if (_videoEdit != null && (_videoEdit!.chapters.isNotEmpty || _videoEdit!.textOverlays.isNotEmpty))
                   Expanded(
                     child: SingleChildScrollView(
