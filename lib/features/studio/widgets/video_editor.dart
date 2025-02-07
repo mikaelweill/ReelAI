@@ -5,10 +5,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../../../models/video.dart' as model;
 import '../models/video_edit.dart';
+import '../models/interactive_overlay.dart';
 import 'drawing_painter.dart';
 import 'dart:async';
 import 'dart:math';
-import 'interactive/info_card_test_page.dart';
 
 class TrimRegionPainter extends CustomPainter {
   final double? trimStart;
@@ -80,6 +80,8 @@ class _VideoEditorState extends State<VideoEditor> {
   bool _isTextOverlayListExpanded = false;
   bool _isDrawingsListExpanded = false;
   bool _isTrimMode = false;
+  bool _isInfoCardMode = false;
+  InteractiveOverlay? _currentInfoCard;
   
   // Add save indicator state
   bool _isSaving = false;
@@ -1071,24 +1073,101 @@ class _VideoEditorState extends State<VideoEditor> {
     );
   }
 
+  void _addInfoCard() {
+    String title = '';
+    String description = '';
+    List<String> bulletPoints = [];
+    String? linkUrl;
+    String? linkText;
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Add Info Card'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'Title',
+                    hintText: 'Enter card title',
+                  ),
+                  onChanged: (value) => title = value,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    hintText: 'Enter description',
+                  ),
+                  maxLines: 3,
+                  onChanged: (value) => description = value,
+                ),
+                const SizedBox(height: 16),
+                // Bullet points section will be added here
+                const SizedBox(height: 16),
+                TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'Link URL (optional)',
+                    hintText: 'Enter URL',
+                  ),
+                  onChanged: (value) => linkUrl = value.isEmpty ? null : value,
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  decoration: const InputDecoration(
+                    labelText: 'Link Text (optional)',
+                    hintText: 'Enter link text',
+                  ),
+                  onChanged: (value) => linkText = value.isEmpty ? null : value,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                if (title.isNotEmpty && description.isNotEmpty) {
+                  final infoCard = InteractiveOverlay(
+                    id: _uuid.v4(),
+                    title: title,
+                    description: description,
+                    bulletPoints: bulletPoints,
+                    linkUrl: linkUrl,
+                    linkText: linkText,
+                    startTime: 0, // Global card, always visible
+                    endTime: double.infinity,
+                    position: const Offset(0, 0), // Not used for global cards
+                  );
+                  
+                  setState(() {
+                    _videoEdit?.interactiveOverlays.add(infoCard);
+                    _currentInfoCard = infoCard;
+                  });
+                  
+                  Navigator.pop(context);
+                  await _saveVideoEdit();
+                }
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Edit Video'),
-        actions: [
-          // Temporary button for testing info card
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const InfoCardTestPage(),
-                ),
-              );
-            },
-          ),
-        ],
       ),
       body: FutureBuilder(
         future: _initializeVideoPlayerFuture,
@@ -1269,7 +1348,7 @@ class _VideoEditorState extends State<VideoEditor> {
                         icon: const Icon(Icons.bookmark_add),
                         onPressed: _addChapterMark,
                       ),
-                      // Closed Captions (Text Overlay)
+                      // Closed Captions
                       IconButton(
                         icon: const Icon(Icons.text_fields),
                         onPressed: () => _addTextOverlay(),
@@ -1283,6 +1362,7 @@ class _VideoEditorState extends State<VideoEditor> {
                             _isDrawingMode = !_isDrawingMode;
                             if (_isDrawingMode) {
                               _isTrimMode = false;
+                              _isInfoCardMode = false;
                             }
                           });
                         },
@@ -1292,6 +1372,21 @@ class _VideoEditorState extends State<VideoEditor> {
                         icon: const Icon(Icons.content_cut),
                         color: _isTrimMode ? Colors.blue : null,
                         onPressed: _toggleTrimMode,
+                      ),
+                      // Info Card
+                      IconButton(
+                        icon: const Icon(Icons.info_outline),
+                        color: _isInfoCardMode ? Colors.blue : null,
+                        onPressed: () {
+                          setState(() {
+                            _isInfoCardMode = !_isInfoCardMode;
+                            if (_isInfoCardMode) {
+                              _isDrawingMode = false;
+                              _isTrimMode = false;
+                              _addInfoCard();
+                            }
+                          });
+                        },
                       ),
                     ],
                   ),

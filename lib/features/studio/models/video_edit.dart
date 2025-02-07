@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../widgets/drawing_painter.dart';
+import 'interactive_overlay.dart';
 
 class TextOverlay {
   final String id;
@@ -103,6 +104,7 @@ class VideoEdit {
   final List<ChapterMark> chapters;
   final List<Caption> captions;
   final List<DrawingStroke> drawings;
+  final List<InteractiveOverlay> interactiveOverlays;
   final Map<String, dynamic>? soundEdits;
   final DateTime lastModified;
   final double? trimStartTime;  // in seconds, null means no trim
@@ -114,11 +116,13 @@ class VideoEdit {
     required this.chapters,
     required this.captions,
     List<DrawingStroke>? drawings,
+    List<InteractiveOverlay>? interactiveOverlays,
     this.soundEdits,
     required this.lastModified,
     this.trimStartTime,
     this.trimEndTime,
-  }) : drawings = drawings ?? [];
+  }) : drawings = drawings ?? [],
+       interactiveOverlays = interactiveOverlays ?? [];
 
   Map<String, dynamic> toJson() => {
     'videoId': videoId,
@@ -126,6 +130,7 @@ class VideoEdit {
     'chapters': chapters.map((e) => e.toJson()).toList(),
     'captions': captions.map((e) => e.toJson()).toList(),
     'drawings': drawings.map((e) => e.toJson()).toList(),
+    'interactiveOverlays': interactiveOverlays.map((e) => e.toJson()).toList(),
     'soundEdits': soundEdits,
     'lastModified': Timestamp.fromDate(lastModified),
     'trimStartTime': trimStartTime,
@@ -145,6 +150,9 @@ class VideoEdit {
         .toList(),
     drawings: (json['drawings'] as List? ?? [])
         .map((e) => DrawingStroke.fromJson(e))
+        .toList(),
+    interactiveOverlays: (json['interactiveOverlays'] as List? ?? [])
+        .map((e) => InteractiveOverlay.fromJson(e))
         .toList(),
     soundEdits: json['soundEdits'],
     lastModified: (json['lastModified'] as Timestamp).toDate(),
