@@ -4,6 +4,7 @@ import 'package:media_kit_video/media_kit_video.dart' as mk;
 import 'package:visibility_detector/visibility_detector.dart';
 import '../services/video_feed_service.dart';
 import '../../studio/models/video_edit.dart';
+import '../../studio/widgets/drawing_painter.dart';
 import 'video_chapter_list.dart';
 
 class VideoCard extends StatefulWidget {
@@ -259,6 +260,18 @@ class _VideoCardState extends State<VideoCard> {
                         controller: widget.controller,
                         controls: null,
                       ),
+                      // Add drawing layer
+                      if (_videoEdit != null)
+                        Positioned.fill(
+                          child: CustomPaint(
+                            painter: SimpleDrawingPainter(
+                              strokes: _videoEdit!.drawings,
+                              currentTime: _currentPosition,
+                              currentStroke: null,  // No current stroke in playback
+                            ),
+                            size: Size.infinite,
+                          ),
+                        ),
                       if (_videoEdit != null)
                         ..._videoEdit!.textOverlays
                             .where((overlay) =>

@@ -932,33 +932,42 @@ class _VideoEditorState extends State<VideoEditor> {
                       color: isActive ? Colors.white70 : Colors.white38,
                     ),
                   ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Delete Drawing?'),
-                          content: Text('Are you sure you want to delete Drawing ${index + 1}?'),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('Cancel'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.white70),
+                        onPressed: () => _editDrawing(stroke),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: const Text('Delete Drawing?'),
+                              content: Text('Are you sure you want to delete Drawing ${index + 1}?'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('Cancel'),
+                                ),
+                                TextButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _strokes.remove(stroke);
+                                    });
+                                    _saveVideoEdit();
+                                    Navigator.pop(context);
+                                  },
+                                  child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                ),
+                              ],
                             ),
-                            TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  _strokes.remove(stroke);
-                                });
-                                _saveVideoEdit();
-                                Navigator.pop(context);
-                              },
-                              child: const Text('Delete', style: TextStyle(color: Colors.red)),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                          );
+                        },
+                      ),
+                    ],
                   ),
                   onTap: () {
                     _player.seek(
@@ -972,6 +981,92 @@ class _VideoEditorState extends State<VideoEditor> {
             ),
           ),
       ],
+    );
+  }
+
+  void _editDrawing(DrawingStroke stroke) {
+    double startTime = stroke.startTime;
+    double endTime = stroke.endTime;
+    
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final duration = endTime - startTime;
+            
+            return AlertDialog(
+              title: const Text('Edit Drawing Duration'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 16),
+                  Text('Start Time: ${startTime.toStringAsFixed(1)}s'),
+                  Slider(
+                    value: startTime,
+                    min: 0,
+                    max: _player.state.duration.inMilliseconds / 1000 - duration,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        startTime = value;
+                        endTime = value + duration;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Text('Duration: ${duration.toStringAsFixed(1)}s'),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Slider(
+                          value: duration,
+                          min: 1.0,
+                          max: 10.0,
+                          divisions: 18,
+                          onChanged: (value) {
+                            setDialogState(() {
+                              endTime = startTime + value;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    setState(() {
+                      // Remove the old stroke
+                      _strokes.remove(stroke);
+                      // Add the updated stroke with new timing
+                      _strokes.add(DrawingStroke(
+                        id: stroke.id,
+                        points: stroke.points,
+                        color: stroke.color,
+                        width: stroke.width,
+                        startTime: startTime,
+                        endTime: endTime,
+                      ));
+                    });
+                    Navigator.pop(context);
+                    await _saveVideoEdit();
+                    // Seek to the new start time
+                    _player.seek(Duration(milliseconds: (startTime * 1000).round()));
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
