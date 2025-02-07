@@ -36,6 +36,7 @@ dependencies:
   video_compress: ^3.1.2  # Add video compression package
   image_picker: ^1.0.7
   uuid: ^4.3.3  # Add UUID package
+  perfect_freehand: ^2.3.1  # Drawing functionality
 
 dev_dependencies:
   flutter_test:

@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../../../models/video.dart' as model;
 import '../models/video_edit.dart';
+import 'drawing_painter.dart';
 
 class TrimRegionPainter extends CustomPainter {
   final double? trimStart;
@@ -78,6 +79,10 @@ class _VideoEditorState extends State<VideoEditor> {
   
   double? _tempTrimStart;
   double? _tempTrimEnd;
+
+  // Add drawing mode state
+  bool _isDrawingMode = false;
+  List<Offset> _currentStroke = [];
 
   @override
   void initState() {
@@ -763,7 +768,7 @@ class _VideoEditorState extends State<VideoEditor> {
             return Column(
               children: [
                 AspectRatio(
-                  aspectRatio: 16/9,  // Default aspect ratio
+                  aspectRatio: 16/9,
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
@@ -799,6 +804,31 @@ class _VideoEditorState extends State<VideoEditor> {
                                 ),
                               ),
                             ),
+                      // Add drawing layer
+                      if (_isDrawingMode)
+                        Positioned.fill(
+                          child: GestureDetector(
+                            onPanStart: (details) {
+                              setState(() {
+                                _currentStroke = [details.localPosition];
+                              });
+                            },
+                            onPanUpdate: (details) {
+                              setState(() {
+                                _currentStroke.add(details.localPosition);
+                              });
+                            },
+                            onPanEnd: (_) {
+                              setState(() {
+                                _currentStroke = [];
+                              });
+                            },
+                            child: CustomPaint(
+                              painter: SimpleDrawingPainter(_currentStroke),
+                              size: Size.infinite,
+                            ),
+                          ),
+                        ),
                       GestureDetector(
                         onTap: () {
                           setState(() {
@@ -838,9 +868,22 @@ class _VideoEditorState extends State<VideoEditor> {
                         onPressed: _addChapterMark,
                       ),
                       IconButton(
-                        icon: Icon(Icons.content_cut),
+                        icon: const Icon(Icons.content_cut),
                         color: _isTrimMode ? Colors.blue : null,
                         onPressed: _toggleTrimMode,
+                      ),
+                      // Add drawing mode toggle
+                      IconButton(
+                        icon: const Icon(Icons.brush),
+                        color: _isDrawingMode ? Colors.blue : null,
+                        onPressed: () {
+                          setState(() {
+                            _isDrawingMode = !_isDrawingMode;
+                            if (_isDrawingMode) {
+                              _isTrimMode = false;
+                            }
+                          });
+                        },
                       ),
                     ],
                   ),
