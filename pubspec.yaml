@@ -37,6 +37,7 @@ dependencies:
   image_picker: ^1.0.7
   uuid: ^4.3.3  # Add UUID package
   perfect_freehand: ^2.3.1  # Drawing functionality
+  url_launcher: ^6.2.5  # For launching URLs
 
 dev_dependencies:
   flutter_test:

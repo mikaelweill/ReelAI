@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart' as mk;
 import 'package:visibility_detector/visibility_detector.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/video_feed_service.dart';
 import '../../studio/models/video_edit.dart';
 import '../../studio/widgets/drawing_painter.dart';
@@ -149,6 +150,12 @@ class _VideoCardState extends State<VideoCard> {
     if (_videoEdit?.interactiveOverlays.isEmpty == true) return;
     
     final card = _videoEdit!.interactiveOverlays.first;
+    print('Debug - Info Card Data:');
+    print('Title: ${card.title}');
+    print('Description: ${card.description}');
+    print('URL: ${card.linkUrl}');
+    print('Link Text: ${card.linkText}');
+    
     showDialog(
       context: context,
       barrierColor: Colors.black38,
@@ -213,25 +220,83 @@ class _VideoCardState extends State<VideoCard> {
                           ),
                         )),
                       ],
-                      if (card.linkUrl != null && card.linkText != null) ...[
+                      if (card.linkUrl != null) ...[
                         const SizedBox(height: 16),
-                        TextButton(
-                          onPressed: () {
-                            // TODO: Implement URL launching
+                        GestureDetector(
+                          onTap: () async {
+                            try {
+                              String url = card.linkUrl!.trim();
+                              // Add https:// if not present and no other protocol is specified
+                              if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                                url = 'https://$url';
+                              }
+                              
+                              print('Attempting to launch URL: $url');
+                              final uri = Uri.parse(url);
+                              
+                              // First check if we can launch
+                              if (await canLaunchUrl(uri)) {
+                                print('URL can be launched, attempting launch...');
+                                final launched = await launchUrl(
+                                  uri,
+                                  mode: LaunchMode.externalApplication,
+                                  webViewConfiguration: const WebViewConfiguration(
+                                    enableJavaScript: true,
+                                    enableDomStorage: true,
+                                  ),
+                                );
+                                
+                                if (!launched) {
+                                  print('URL launch returned false');
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Could not open the URL'),
+                                        duration: Duration(seconds: 2),
+                                      ),
+                                    );
+                                  }
+                                }
+                              } else {
+                                print('canLaunchUrl returned false for $url');
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('This URL cannot be opened'),
+                                      duration: Duration(seconds: 2),
+                                    ),
+                                  );
+                                }
+                              }
+                            } catch (e) {
+                              print('Error launching URL: $e');
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error opening URL: $e'),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              }
+                            }
                           },
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                card.linkText!,
-                                style: const TextStyle(color: Colors.blue),
-                              ),
-                              const SizedBox(width: 4),
-                              const Icon(Icons.open_in_new, size: 16, color: Colors.blue),
-                            ],
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  card.linkText ?? card.linkUrl!,
+                                  style: const TextStyle(
+                                    color: Colors.blue,
+                                    fontSize: 16,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.open_in_new, size: 16, color: Colors.blue),
+                              ],
+                            ),
                           ),
                         ),
                       ],
