@@ -7,6 +7,7 @@ import '../../../models/video.dart' as model;
 import '../models/video_edit.dart';
 import 'drawing_painter.dart';
 import 'dart:async';
+import 'dart:math';
 
 class TrimRegionPainter extends CustomPainter {
   final double? trimStart;
@@ -76,6 +77,7 @@ class _VideoEditorState extends State<VideoEditor> {
   final _uuid = const Uuid();
   bool _isChapterListExpanded = false;
   bool _isTextOverlayListExpanded = false;
+  bool _isDrawingsListExpanded = false;
   bool _isTrimMode = false;
   
   // Add save indicator state
@@ -837,6 +839,142 @@ class _VideoEditorState extends State<VideoEditor> {
     );
   }
 
+  // Add this method to build the drawings list section
+  Widget _buildDrawingsList() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Drawings header with expand/collapse
+        GestureDetector(
+          onTap: () => setState(() {
+            _isDrawingsListExpanded = !_isDrawingsListExpanded;
+          }),
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              children: [
+                const Icon(Icons.brush, size: 16, color: Colors.white70),
+                const SizedBox(width: 8),
+                Text(
+                  'Drawings (${_strokes.length})',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  _isDrawingsListExpanded ? Icons.expand_less : Icons.expand_more,
+                  color: Colors.white70,
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Drawings list (collapsible)
+        if (_isDrawingsListExpanded)
+          Container(
+            constraints: const BoxConstraints(maxHeight: 200),
+            child: ListView.builder(
+              shrinkWrap: true,
+              physics: const ClampingScrollPhysics(),
+              itemCount: _strokes.length,
+              itemBuilder: (context, index) {
+                final sortedStrokes = _strokes.toList()
+                  ..sort((a, b) => a.startTime.compareTo(b.startTime));
+                
+                final stroke = sortedStrokes[index];
+                final isActive = _currentPosition >= stroke.startTime && 
+                               _currentPosition <= stroke.endTime;
+                
+                return ListTile(
+                  leading: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: stroke.color,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white24,
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 40,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: Colors.black26,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: CustomPaint(
+                          painter: StrokePreviewPainter(stroke: stroke),
+                          size: const Size(40, 24),
+                        ),
+                      ),
+                    ],
+                  ),
+                  title: Text(
+                    'Drawing ${index + 1}',
+                    style: TextStyle(
+                      color: isActive ? Colors.white : Colors.white70,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${stroke.startTime.toStringAsFixed(1)}s - ${stroke.endTime.toStringAsFixed(1)}s',
+                    style: TextStyle(
+                      color: isActive ? Colors.white70 : Colors.white38,
+                    ),
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text('Delete Drawing?'),
+                          content: Text('Are you sure you want to delete Drawing ${index + 1}?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _strokes.remove(stroke);
+                                });
+                                _saveVideoEdit();
+                                Navigator.pop(context);
+                              },
+                              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                  onTap: () {
+                    _player.seek(
+                      Duration(
+                        milliseconds: (stroke.startTime * 1000).round(),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1077,12 +1215,16 @@ class _VideoEditorState extends State<VideoEditor> {
                       ],
                     ),
                   ),
-                if (_videoEdit != null && (_videoEdit!.chapters.isNotEmpty || _videoEdit!.textOverlays.isNotEmpty))
+                if (_videoEdit != null && (_videoEdit!.chapters.isNotEmpty || _videoEdit!.textOverlays.isNotEmpty || _strokes.isNotEmpty))
                   Expanded(
                     child: SingleChildScrollView(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          // Drawings section
+                          if (_strokes.isNotEmpty)
+                            _buildDrawingsList(),
+                          
                           // Chapters section
                           if (_videoEdit!.chapters.isNotEmpty)
                             Column(
@@ -1366,4 +1508,45 @@ class ChapterMarkerPainter extends CustomPainter {
   @override
   bool shouldRepaint(ChapterMarkerPainter oldDelegate) =>
       currentPosition != oldDelegate.currentPosition;
+}
+
+class StrokePreviewPainter extends CustomPainter {
+  final DrawingStroke stroke;
+
+  StrokePreviewPainter({required this.stroke});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (stroke.points.isEmpty) return;
+
+    final paint = Paint()
+      ..color = stroke.color
+      ..strokeWidth = stroke.width
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    // Scale the points to fit in the preview
+    final xPoints = stroke.points.map((p) => p.dx).toList();
+    final yPoints = stroke.points.map((p) => p.dy).toList();
+    final minX = xPoints.reduce(min);
+    final maxX = xPoints.reduce(max);
+    final minY = yPoints.reduce(min);
+    final maxY = yPoints.reduce(max);
+    
+    final xScale = size.width / (maxX - minX);
+    final yScale = size.height / (maxY - minY);
+    final scale = min(xScale, yScale) * 0.8;  // 0.8 to add some padding
+
+    final scaledPoints = stroke.points.map((p) => Offset(
+      (p.dx - minX) * scale + (size.width - (maxX - minX) * scale) / 2,
+      (p.dy - minY) * scale + (size.height - (maxY - minY) * scale) / 2,
+    )).toList();
+
+    for (int i = 0; i < scaledPoints.length - 1; i++) {
+      canvas.drawLine(scaledPoints[i], scaledPoints[i + 1], paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(StrokePreviewPainter oldDelegate) => false;
 } 
