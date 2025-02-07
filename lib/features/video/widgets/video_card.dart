@@ -45,9 +45,29 @@ class _VideoCardState extends State<VideoCard> {
   void _setupPositionListener() {
     widget.player.stream.position.listen((position) {
       if (mounted) {
+        final currentPos = position.inMilliseconds / 1000.0;
         setState(() {
-          _currentPosition = position.inMilliseconds / 1000;
+          _currentPosition = currentPos;
         });
+
+        // Enforce trim boundaries during playback
+        if (_videoEdit != null && widget.player.state.playing) {
+          final trimStart = _videoEdit!.trimStartTime;
+          final trimEnd = _videoEdit!.trimEndTime;
+          
+          if (trimEnd != null && currentPos >= trimEnd) {
+            // If we hit the trim end, loop back to trim start
+            if (trimStart != null) {
+              widget.player.seek(Duration(milliseconds: (trimStart * 1000).round()));
+            } else {
+              // If no trim start defined, go to beginning
+              widget.player.seek(Duration.zero);
+            }
+          } else if (trimStart != null && currentPos < trimStart) {
+            // If somehow we're before trim start, seek to trim start
+            widget.player.seek(Duration(milliseconds: (trimStart * 1000).round()));
+          }
+        }
       }
     });
   }
@@ -62,11 +82,16 @@ class _VideoCardState extends State<VideoCard> {
 
   Future<void> _loadVideoEdit() async {
     _feedService.getVideoEdits(widget.video.id).listen((videoEdit) {
-      if (mounted && videoEdit?.chapters.isNotEmpty == true) {
+      if (mounted) {
         setState(() {
           _videoEdit = videoEdit;
           _isChapterListExpanded = false;
         });
+        
+        // If we have trim points, seek to start point
+        if (videoEdit?.trimStartTime != null && widget.player.state.playing) {
+          widget.player.seek(Duration(milliseconds: (videoEdit!.trimStartTime! * 1000).round()));
+        }
       }
     });
   }

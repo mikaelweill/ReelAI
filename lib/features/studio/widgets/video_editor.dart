@@ -111,21 +111,27 @@ class _VideoEditorState extends State<VideoEditor> {
     // Set up position listener
     _player.stream.position.listen((position) {
       if (mounted) {
-        final currentPos = position.inMilliseconds / 1000;
+        final currentPos = position.inMilliseconds / 1000.0;  // Convert to seconds
         setState(() {
           _currentPosition = currentPos;
         });
 
-        // Handle trim end point
-        if (_videoEdit?.trimEndTime != null && 
-            currentPos >= _videoEdit!.trimEndTime! &&
-            _isPlaying) {
-          // If we hit the trim end, loop back to trim start
-          if (_videoEdit?.trimStartTime != null) {
-            _player.seek(Duration(milliseconds: (_videoEdit!.trimStartTime! * 1000).round()));
-          } else {
-            // If no trim start defined, go to beginning
-            _player.seek(Duration.zero);
+        // Handle trim boundaries during playback
+        if (_videoEdit != null) {
+          final trimStart = _videoEdit!.trimStartTime;
+          final trimEnd = _videoEdit!.trimEndTime;
+          
+          if (trimEnd != null && currentPos >= trimEnd && _isPlaying) {
+            // If we hit the trim end, loop back to trim start
+            if (trimStart != null) {
+              _player.seek(Duration(milliseconds: (trimStart * 1000).round()));
+            } else {
+              // If no trim start defined, go to beginning
+              _player.seek(Duration.zero);
+            }
+          } else if (trimStart != null && currentPos < trimStart && _isPlaying) {
+            // If somehow we're before trim start, seek to trim start
+            _player.seek(Duration(milliseconds: (trimStart * 1000).round()));
           }
         }
       }
