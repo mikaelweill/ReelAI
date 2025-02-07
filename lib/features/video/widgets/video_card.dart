@@ -151,7 +151,7 @@ class _VideoCardState extends State<VideoCard> {
     final card = _videoEdit!.interactiveOverlays.first;
     showDialog(
       context: context,
-      barrierColor: Colors.black54,
+      barrierColor: Colors.black38,
       builder: (context) => Theme(
         data: Theme.of(context).copyWith(
           dialogBackgroundColor: Colors.transparent,
@@ -162,7 +162,7 @@ class _VideoCardState extends State<VideoCard> {
           contentPadding: EdgeInsets.zero,
           content: Container(
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.75),
+              color: Colors.black.withOpacity(0.5),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: Colors.white24,
