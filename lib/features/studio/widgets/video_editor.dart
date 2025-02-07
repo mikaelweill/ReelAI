@@ -965,7 +965,10 @@ class _VideoEditorState extends State<VideoEditor> {
                               icon: const Icon(Icons.clear_all),
                               label: const Text('Clear All'),
                               onPressed: _strokes.isNotEmpty
-                                ? () => setState(() => _strokes.clear())
+                                ? () => setState(() {
+                                    _strokes.clear();
+                                    _currentStroke = [];
+                                  })
                                 : null,
                             ),
                           ],
