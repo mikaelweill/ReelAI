@@ -111,21 +111,21 @@ class _VideoEditorState extends State<VideoEditor> {
     // Set up position listener
     _player.stream.position.listen((position) {
       if (mounted) {
+        final currentPos = position.inMilliseconds / 1000;
         setState(() {
-          _currentPosition = position.inMilliseconds / 1000;
+          _currentPosition = currentPos;
         });
 
         // Handle trim end point
         if (_videoEdit?.trimEndTime != null && 
-            _currentPosition >= _videoEdit!.trimEndTime! &&
+            currentPos >= _videoEdit!.trimEndTime! &&
             _isPlaying) {
-          // If we hit the trim end, either loop or pause
-          if (_player.state.playlistMode == PlaylistMode.loop) {
-            // Loop back to trim start
+          // If we hit the trim end, loop back to trim start
+          if (_videoEdit?.trimStartTime != null) {
             _player.seek(Duration(milliseconds: (_videoEdit!.trimStartTime! * 1000).round()));
           } else {
-            // Pause at trim end
-            _player.pause();
+            // If no trim start defined, go to beginning
+            _player.seek(Duration.zero);
           }
         }
       }
@@ -211,6 +211,8 @@ class _VideoEditorState extends State<VideoEditor> {
     print('- VideoID: ${_videoEdit!.videoId}');
     print('- Number of chapters: ${_videoEdit!.chapters.length}');
     print('- Chapters: ${_videoEdit!.chapters.map((c) => '${c.title}@${c.timestamp}s').join(', ')}');
+    print('- Trim Start: ${_videoEdit!.trimStartTime}');
+    print('- Trim End: ${_videoEdit!.trimEndTime}');
 
     try {
       // Create a new VideoEdit with updated timestamp
@@ -220,6 +222,8 @@ class _VideoEditorState extends State<VideoEditor> {
         chapters: _videoEdit!.chapters,
         captions: _videoEdit!.captions,
         lastModified: DateTime.now(),
+        trimStartTime: _videoEdit!.trimStartTime,  // Include trim start
+        trimEndTime: _videoEdit!.trimEndTime,      // Include trim end
       );
 
       final docRef = _firestore
@@ -528,6 +532,10 @@ class _VideoEditorState extends State<VideoEditor> {
     // Get the effective trim points (either temporary or saved)
     final effectiveTrimStart = _isTrimMode ? _tempTrimStart : _videoEdit?.trimStartTime;
     final effectiveTrimEnd = _isTrimMode ? _tempTrimEnd : _videoEdit?.trimEndTime;
+
+    // Convert all values to seconds for consistent handling
+    final positionInSeconds = position.inMilliseconds / 1000.0;
+    final durationInSeconds = totalMillis / 1000.0;
     
     return Column(
       children: [
@@ -606,26 +614,30 @@ class _VideoEditorState extends State<VideoEditor> {
                 child: _isTrimMode
                   ? RangeSlider(
                       values: RangeValues(
-                        _tempTrimStart ?? _videoEdit?.trimStartTime ?? 0,
-                        _tempTrimEnd ?? _videoEdit?.trimEndTime ?? totalMillis/1000,
+                        effectiveTrimStart ?? 0.0,
+                        effectiveTrimEnd ?? durationInSeconds,
                       ),
-                      min: 0,
-                      max: totalMillis/1000,
+                      min: 0.0,
+                      max: durationInSeconds,
+                      divisions: 100,
                       onChanged: (RangeValues values) {
-                        setState(() {
-                          _tempTrimStart = values.start;
-                          _tempTrimEnd = values.end;
-                        });
-                        _constrainedSeek(Duration(milliseconds: (values.start * 1000).round()));
+                        // Validate the range
+                        if (values.end - values.start >= 1.0) {  // Minimum 1 second difference
+                          setState(() {
+                            _tempTrimStart = values.start;
+                            _tempTrimEnd = values.end;
+                          });
+                          _player.seek(Duration(milliseconds: (values.start * 1000).round()));
+                        }
                       },
                     )
                   : Slider(
-                      value: position.inMilliseconds.toDouble(),
-                      min: effectiveTrimStart != null ? effectiveTrimStart * 1000 : 0.0,
-                      max: effectiveTrimEnd != null ? effectiveTrimEnd * 1000 : totalMillis,
+                      value: positionInSeconds,
+                      min: 0.0,  // Always allow full range in normal mode
+                      max: durationInSeconds,
                       onChanged: (value) {
-                        final newPosition = Duration(milliseconds: value.round());
-                        _constrainedSeek(newPosition);
+                        final newPosition = Duration(milliseconds: (value * 1000).round());
+                        _player.seek(newPosition);  // Direct seek in normal mode
                       },
                     ),
               ),
