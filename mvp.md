@@ -68,6 +68,7 @@
    - Navigation integration ✓
    - Video compression service ✓
    - Upload progress tracking ✓
+   - File cleanup after upload ✓
    - Thumbnail generation (Not Started)
 
 2. Video Editor UI ✓
@@ -76,6 +77,54 @@
    - Timeline scrubber (Studio only) ✓
    - Text Overlay System ✓
    - Chapter marker interface ✓
+
+### Creator Features (New)
+1. Video Management
+   - Batch video upload
+   - Draft support
+   - Video scheduling
+   - Analytics dashboard
+   - Engagement metrics
+   - A/B testing tools
+
+2. Content Organization
+   - Custom collections
+   - Series management
+   - Content calendar
+   - Tags and categories
+   - Bulk editing tools
+
+3. Engagement Tools
+   - Comment management
+   - Viewer insights
+   - Response templates
+   - Pinned comments
+   - Featured content
+
+4. Advanced Studio Features
+   - Multi-clip editing
+   - Transition effects
+   - Sound library
+   - Custom thumbnails
+   - End screens
+   - Watermarks
+   - Branding presets
+
+5. Creator Analytics
+   - View duration metrics
+   - Audience retention
+   - Traffic sources
+   - Viewer demographics
+   - Peak viewing times
+   - Export reports
+
+6. Monetization Features
+   - Ad integration
+   - Sponsorship tools
+   - Merchandise integration
+   - Subscription management
+   - Tip jar/donations
+   - Revenue analytics
 
 ### Immediate Next Steps (Prioritized):
 1. Video Quality & Performance
@@ -186,6 +235,78 @@ videos/{videoId} ✓
     fallback: string   // Direct video URL fallback
   },
   qualities: string[], // Available quality variants
+  // Creator Features
+  scheduledPublishTime?: timestamp, // For scheduled publishing
+  collectionIds?: string[],  // For organizing into collections
+  tags?: string[],          // For categorization
+  monetization?: {          // Monetization settings
+    isMonetized: boolean,
+    adBreaks?: number[],    // Timestamps for mid-roll ads
+    sponsorshipEnabled: boolean
+  },
+  analytics?: {             // Quick access analytics
+    avgViewDuration: number,
+    completionRate: number,
+    engagement: number      // Composite engagement score
+  }
+}
+```
+
+#### Creator Collections (NEW)
+```typescript
+collections/{collectionId} {
+  userId: string,          // Creator who owns the collection
+  name: string,           // Collection name
+  description: string?,   // Optional description
+  isPublic: boolean,      // Whether collection is visible to viewers
+  videoIds: string[],     // Videos in this collection
+  order: number[],        // Custom ordering of videos
+  createdAt: timestamp,
+  updatedAt: timestamp,
+  thumbnailUrl?: string   // Custom collection thumbnail
+}
+```
+
+#### Creator Analytics (NEW)
+```typescript
+creator_analytics/{userId}/daily/{date} {
+  totalViews: number,
+  uniqueViewers: number,
+  watchTime: number,      // Total minutes watched
+  engagement: {
+    likes: number,
+    comments: number,
+    shares: number
+  },
+  demographics: {
+    ageRanges: Map<string, number>,
+    countries: Map<string, number>
+  },
+  peakViewingTimes: number[],  // 24 hourly slots
+  topVideos: [{
+    videoId: string,
+    views: number,
+    avgWatchTime: number
+  }]
+}
+```
+
+#### Creator Revenue (NEW)
+```typescript
+creator_revenue/{userId}/monthly/{date} {
+  total: number,          // Total revenue
+  breakdown: {
+    ads: number,          // Ad revenue
+    sponsorships: number, // Sponsorship revenue
+    tips: number,         // Viewer tips/donations
+    subscriptions: number // Subscription revenue
+  },
+  pendingPayout: number,  // Amount not yet paid out
+  lastPayout: {
+    amount: number,
+    date: timestamp,
+    method: string
+  }
 }
 ```
 

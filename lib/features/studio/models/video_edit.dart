@@ -103,6 +103,8 @@ class VideoEdit {
   final List<Caption> captions;
   final Map<String, dynamic>? soundEdits;
   final DateTime lastModified;
+  final double? trimStartTime;  // in seconds, null means no trim
+  final double? trimEndTime;    // in seconds, null means no trim
 
   VideoEdit({
     required this.videoId,
@@ -111,6 +113,8 @@ class VideoEdit {
     required this.captions,
     this.soundEdits,
     required this.lastModified,
+    this.trimStartTime,
+    this.trimEndTime,
   });
 
   Map<String, dynamic> toJson() => {
@@ -120,6 +124,8 @@ class VideoEdit {
     'captions': captions.map((e) => e.toJson()).toList(),
     'soundEdits': soundEdits,
     'lastModified': Timestamp.fromDate(lastModified),
+    'trimStartTime': trimStartTime,
+    'trimEndTime': trimEndTime,
   };
 
   factory VideoEdit.fromJson(Map<String, dynamic> json) => VideoEdit(
@@ -135,5 +141,7 @@ class VideoEdit {
         .toList(),
     soundEdits: json['soundEdits'],
     lastModified: (json['lastModified'] as Timestamp).toDate(),
+    trimStartTime: json['trimStartTime']?.toDouble(),
+    trimEndTime: json['trimEndTime']?.toDouble(),
   );
 } 

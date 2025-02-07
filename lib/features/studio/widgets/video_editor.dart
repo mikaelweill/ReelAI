@@ -6,6 +6,50 @@ import 'package:uuid/uuid.dart';
 import '../../../models/video.dart' as model;
 import '../models/video_edit.dart';
 
+class TrimRegionPainter extends CustomPainter {
+  final double? trimStart;
+  final double? trimEnd;
+  final double totalDuration;
+
+  TrimRegionPainter({
+    required this.trimStart,
+    required this.trimEnd,
+    required this.totalDuration,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (trimStart == null || trimEnd == null) return;
+
+    final paint = Paint()
+      ..color = Colors.black.withOpacity(0.5)
+      ..style = PaintingStyle.fill;
+
+    // Draw dimmed region before trim start
+    final startX = (trimStart! * 1000) * size.width / totalDuration;
+    if (startX > 0) {
+      canvas.drawRect(
+        Rect.fromLTWH(0, 0, startX, size.height),
+        paint,
+      );
+    }
+
+    // Draw dimmed region after trim end
+    final endX = (trimEnd! * 1000) * size.width / totalDuration;
+    if (endX < size.width) {
+      canvas.drawRect(
+        Rect.fromLTWH(endX, 0, size.width - endX, size.height),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(TrimRegionPainter oldDelegate) =>
+      trimStart != oldDelegate.trimStart ||
+      trimEnd != oldDelegate.trimEnd;
+}
+
 class VideoEditor extends StatefulWidget {
   final model.Video video;
 
@@ -30,6 +74,10 @@ class _VideoEditorState extends State<VideoEditor> {
   final _uuid = const Uuid();
   bool _isChapterListExpanded = false;
   bool _isTextOverlayListExpanded = false;
+  bool _isTrimMode = false;
+  
+  double? _tempTrimStart;
+  double? _tempTrimEnd;
 
   @override
   void initState() {
@@ -55,12 +103,31 @@ class _VideoEditorState extends State<VideoEditor> {
     await _player.open(Media(widget.video.videoUrl));
     await _player.setPlaylistMode(PlaylistMode.loop);
     
+    // Set initial position to trim start if exists
+    if (_videoEdit?.trimStartTime != null) {
+      await _player.seek(Duration(milliseconds: (_videoEdit!.trimStartTime! * 1000).round()));
+    }
+    
     // Set up position listener
     _player.stream.position.listen((position) {
       if (mounted) {
         setState(() {
           _currentPosition = position.inMilliseconds / 1000;
         });
+
+        // Handle trim end point
+        if (_videoEdit?.trimEndTime != null && 
+            _currentPosition >= _videoEdit!.trimEndTime! &&
+            _isPlaying) {
+          // If we hit the trim end, either loop or pause
+          if (_player.state.playlistMode == PlaylistMode.loop) {
+            // Loop back to trim start
+            _player.seek(Duration(milliseconds: (_videoEdit!.trimStartTime! * 1000).round()));
+          } else {
+            // Pause at trim end
+            _player.pause();
+          }
+        }
       }
     });
     
@@ -352,10 +419,115 @@ class _VideoEditorState extends State<VideoEditor> {
     return "$twoDigitMinutes:$twoDigitSeconds";
   }
 
+  Widget _buildTrimControls(double totalMillis) {
+    return Column(
+      children: [
+        // Trim time indicators
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                _formatDuration(Duration(milliseconds: (_tempTrimStart ?? 0 * 1000).round())),
+                style: const TextStyle(color: Colors.blue),
+              ),
+              Text(
+                _formatDuration(Duration(milliseconds: (_tempTrimEnd ?? totalMillis/1000).round())),
+                style: const TextStyle(color: Colors.blue),
+              ),
+            ],
+          ),
+        ),
+        // Double-ended trim slider
+        SizedBox(
+          height: 40,
+          child: RangeSlider(
+            values: RangeValues(
+              _tempTrimStart ?? 0,
+              _tempTrimEnd ?? totalMillis/1000,
+            ),
+            min: 0,
+            max: totalMillis/1000,
+            activeColor: Colors.blue,
+            inactiveColor: Colors.white24,
+            onChanged: (RangeValues values) {
+              setState(() {
+                _tempTrimStart = values.start;
+                _tempTrimEnd = values.end;
+              });
+              // Seek to the current trim position
+              _player.seek(Duration(milliseconds: (values.start * 1000).round()));
+            },
+          ),
+        ),
+        // Apply/Cancel buttons
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _isTrimMode = false;
+                  _tempTrimStart = null;
+                  _tempTrimEnd = null;
+                });
+              },
+              child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+            ),
+            const SizedBox(width: 16),
+            ElevatedButton(
+              onPressed: () async {
+                // Update the video edit with new trim values
+                if (_videoEdit != null) {
+                  final updatedEdit = VideoEdit(
+                    videoId: _videoEdit!.videoId,
+                    textOverlays: _videoEdit!.textOverlays,
+                    chapters: _videoEdit!.chapters,
+                    captions: _videoEdit!.captions,
+                    lastModified: DateTime.now(),
+                    trimStartTime: _tempTrimStart,
+                    trimEndTime: _tempTrimEnd,
+                  );
+                  setState(() {
+                    _videoEdit = updatedEdit;
+                    _isTrimMode = false;
+                  });
+                  await _saveVideoEdit();
+                }
+              },
+              child: const Text('Apply Trim'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // Add this method to handle constrained seeking
+  Future<void> _constrainedSeek(Duration position) async {
+    if (_videoEdit?.trimStartTime != null && 
+        position.inMilliseconds < _videoEdit!.trimStartTime! * 1000) {
+      // If seeking before trim start, snap to trim start
+      await _player.seek(Duration(milliseconds: (_videoEdit!.trimStartTime! * 1000).round()));
+    } else if (_videoEdit?.trimEndTime != null && 
+               position.inMilliseconds > _videoEdit!.trimEndTime! * 1000) {
+      // If seeking after trim end, snap to trim end
+      await _player.seek(Duration(milliseconds: (_videoEdit!.trimEndTime! * 1000).round()));
+    } else {
+      // Otherwise seek to requested position
+      await _player.seek(position);
+    }
+  }
+
   Widget _buildScrubber() {
     final duration = _player.state.duration;
     final position = _player.state.position;
     final totalMillis = duration.inMilliseconds.toDouble();
+    
+    // Get the effective trim points (either temporary or saved)
+    final effectiveTrimStart = _isTrimMode ? _tempTrimStart : _videoEdit?.trimStartTime;
+    final effectiveTrimEnd = _isTrimMode ? _tempTrimEnd : _videoEdit?.trimEndTime;
     
     return Column(
       children: [
@@ -366,22 +538,41 @@ class _VideoEditorState extends State<VideoEditor> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                _formatDuration(position),
-                style: const TextStyle(color: Colors.white70),
+                effectiveTrimStart != null 
+                  ? _formatDuration(Duration(milliseconds: (effectiveTrimStart * 1000).round()))
+                  : _formatDuration(position),
+                style: TextStyle(
+                  color: effectiveTrimStart != null ? Colors.blue : Colors.white70,
+                ),
               ),
               Text(
-                _formatDuration(duration),
-                style: const TextStyle(color: Colors.white70),
+                effectiveTrimEnd != null
+                  ? _formatDuration(Duration(milliseconds: (effectiveTrimEnd * 1000).round()))
+                  : _formatDuration(duration),
+                style: TextStyle(
+                  color: effectiveTrimEnd != null ? Colors.blue : Colors.white70,
+                ),
               ),
             ],
           ),
         ),
         // Slider with Chapter Markers
         SizedBox(
-          height: 40, // Explicit height for the slider area
+          height: 40,
           child: Stack(
             alignment: Alignment.center,
             children: [
+              // Trim regions (dimmed areas)
+              if (_videoEdit?.trimStartTime != null || _videoEdit?.trimEndTime != null)
+                Positioned.fill(
+                  child: CustomPaint(
+                    painter: TrimRegionPainter(
+                      trimStart: effectiveTrimStart,
+                      trimEnd: effectiveTrimEnd,
+                      totalDuration: totalMillis,
+                    ),
+                  ),
+                ),
               // Chapter Markers
               if (_videoEdit != null && _videoEdit!.chapters.isNotEmpty)
                 Positioned.fill(
@@ -393,32 +584,102 @@ class _VideoEditorState extends State<VideoEditor> {
                     ),
                   ),
                 ),
-              // Main Slider
+              // Slider
               SliderTheme(
                 data: SliderThemeData(
-                  thumbColor: Colors.white,
-                  activeTrackColor: Colors.white,
+                  thumbColor: _isTrimMode ? Colors.blue : Colors.white,
+                  activeTrackColor: _isTrimMode ? Colors.blue.withOpacity(0.5) : Colors.white,
                   inactiveTrackColor: Colors.white24,
                   trackHeight: 2.0,
-                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                  thumbShape: const RoundSliderThumbShape(
+                    enabledThumbRadius: 6,
+                    elevation: 4,
+                    pressedElevation: 8,
+                  ),
+                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 24),
+                  rangeThumbShape: const RoundRangeSliderThumbShape(
+                    enabledThumbRadius: 6,
+                    elevation: 4,
+                    pressedElevation: 8,
+                  ),
                 ),
-                child: Slider(
-                  value: position.inMilliseconds.toDouble(),
-                  min: 0.0,
-                  max: totalMillis,
-                  onChanged: (value) {
-                    final newPosition = Duration(milliseconds: value.round());
-                    _player.seek(newPosition);
-                  },
-                ),
+                child: _isTrimMode
+                  ? RangeSlider(
+                      values: RangeValues(
+                        _tempTrimStart ?? _videoEdit?.trimStartTime ?? 0,
+                        _tempTrimEnd ?? _videoEdit?.trimEndTime ?? totalMillis/1000,
+                      ),
+                      min: 0,
+                      max: totalMillis/1000,
+                      onChanged: (RangeValues values) {
+                        setState(() {
+                          _tempTrimStart = values.start;
+                          _tempTrimEnd = values.end;
+                        });
+                        _constrainedSeek(Duration(milliseconds: (values.start * 1000).round()));
+                      },
+                    )
+                  : Slider(
+                      value: position.inMilliseconds.toDouble(),
+                      min: effectiveTrimStart != null ? effectiveTrimStart * 1000 : 0.0,
+                      max: effectiveTrimEnd != null ? effectiveTrimEnd * 1000 : totalMillis,
+                      onChanged: (value) {
+                        final newPosition = Duration(milliseconds: value.round());
+                        _constrainedSeek(newPosition);
+                      },
+                    ),
               ),
-              // Chapter Titles (show when near marker)
+              // Chapter Titles
               if (_videoEdit != null)
                 ..._buildChapterLabels(totalMillis),
             ],
           ),
         ),
+        // Trim control buttons
+        if (_isTrimMode)
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _isTrimMode = false;
+                      _tempTrimStart = null;
+                      _tempTrimEnd = null;
+                    });
+                  },
+                  child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+                ),
+                const SizedBox(width: 16),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                  ),
+                  onPressed: () async {
+                    if (_videoEdit != null) {
+                      final updatedEdit = VideoEdit(
+                        videoId: _videoEdit!.videoId,
+                        textOverlays: _videoEdit!.textOverlays,
+                        chapters: _videoEdit!.chapters,
+                        captions: _videoEdit!.captions,
+                        lastModified: DateTime.now(),
+                        trimStartTime: _tempTrimStart,
+                        trimEndTime: _tempTrimEnd,
+                      );
+                      setState(() {
+                        _videoEdit = updatedEdit;
+                        _isTrimMode = false;
+                      });
+                      await _saveVideoEdit();
+                    }
+                  },
+                  child: const Text('Apply Trim'),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -456,6 +717,19 @@ class _VideoEditorState extends State<VideoEditor> {
         ),
       );
     }).toList();
+  }
+
+  void _toggleTrimMode() {
+    setState(() {
+      _isTrimMode = !_isTrimMode;
+      if (_isTrimMode) {
+        _tempTrimStart = _videoEdit?.trimStartTime;
+        _tempTrimEnd = _videoEdit?.trimEndTime;
+      } else {
+        _tempTrimStart = null;
+        _tempTrimEnd = null;
+      }
+    });
   }
 
   @override
@@ -544,6 +818,11 @@ class _VideoEditorState extends State<VideoEditor> {
                       IconButton(
                         icon: const Icon(Icons.bookmark_add),
                         onPressed: _addChapterMark,
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.content_cut),
+                        color: _isTrimMode ? Colors.blue : null,
+                        onPressed: _toggleTrimMode,
                       ),
                     ],
                   ),
