@@ -101,6 +101,7 @@ class _VideoEditorState extends State<VideoEditor> {
       textOverlays: [],
       chapters: [],
       captions: [],
+      drawings: [],  // Initialize empty drawings list
       lastModified: DateTime.now(),
     );
     // Then load any existing edits
@@ -175,6 +176,10 @@ class _VideoEditorState extends State<VideoEditor> {
         data['videoId'] = widget.video.id;
         setState(() {
           _videoEdit = VideoEdit.fromJson(data);
+          _strokes = List.from(_videoEdit!.drawings);  // Load drawings from VideoEdit
+          print('\nLoaded drawings from database:');
+          print('- Number of drawings: ${_strokes.length}');
+          print('- Drawings: ${_strokes.map((d) => 'id:${d.id} time:${d.startTime}-${d.endTime}s color:${d.color}').join('\n  ')}');
         });
       } else {
         print('No existing video edit document found, using empty state');
@@ -185,8 +190,10 @@ class _VideoEditorState extends State<VideoEditor> {
             textOverlays: [],
             chapters: [],
             captions: [],
+            drawings: [],  // Initialize empty drawings list
             lastModified: DateTime.now(),
           );
+          _strokes = [];  // Clear strokes
         });
       }
     } catch (e) {
@@ -198,8 +205,10 @@ class _VideoEditorState extends State<VideoEditor> {
           textOverlays: [],
           chapters: [],
           captions: [],
+          drawings: [],  // Initialize empty drawings list
           lastModified: DateTime.now(),
         );
+        _strokes = [];  // Clear strokes
       });
     }
   }
@@ -227,6 +236,8 @@ class _VideoEditorState extends State<VideoEditor> {
     print('- Chapters: ${_videoEdit!.chapters.map((c) => '${c.title}@${c.timestamp}s').join(', ')}');
     print('- Trim Start: ${_videoEdit!.trimStartTime}');
     print('- Trim End: ${_videoEdit!.trimEndTime}');
+    print('- Number of drawings: ${_strokes.length}');
+    print('- Drawings: ${_strokes.map((d) => 'id:${d.id} time:${d.startTime}-${d.endTime}s color:${d.color}').join('\n  ')}');
 
     try {
       // Create a new VideoEdit with updated timestamp
@@ -235,6 +246,7 @@ class _VideoEditorState extends State<VideoEditor> {
         textOverlays: _videoEdit!.textOverlays,
         chapters: _videoEdit!.chapters,
         captions: _videoEdit!.captions,
+        drawings: _strokes,  // Add drawings to save
         lastModified: DateTime.now(),
         trimStartTime: _videoEdit!.trimStartTime,  // Include trim start
         trimEndTime: _videoEdit!.trimEndTime,      // Include trim end
@@ -503,6 +515,7 @@ class _VideoEditorState extends State<VideoEditor> {
                     textOverlays: _videoEdit!.textOverlays,
                     chapters: _videoEdit!.chapters,
                     captions: _videoEdit!.captions,
+                    drawings: _strokes,
                     lastModified: DateTime.now(),
                     trimStartTime: _tempTrimStart,
                     trimEndTime: _tempTrimEnd,
@@ -690,6 +703,7 @@ class _VideoEditorState extends State<VideoEditor> {
                         textOverlays: _videoEdit!.textOverlays,
                         chapters: _videoEdit!.chapters,
                         captions: _videoEdit!.captions,
+                        drawings: _strokes,
                         lastModified: DateTime.now(),
                         trimStartTime: _tempTrimStart,
                         trimEndTime: _tempTrimEnd,

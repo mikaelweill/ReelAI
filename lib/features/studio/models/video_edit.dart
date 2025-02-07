@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../widgets/drawing_painter.dart';
 
 class TextOverlay {
   final String id;
@@ -101,6 +102,7 @@ class VideoEdit {
   final List<TextOverlay> textOverlays;
   final List<ChapterMark> chapters;
   final List<Caption> captions;
+  final List<DrawingStroke> drawings;
   final Map<String, dynamic>? soundEdits;
   final DateTime lastModified;
   final double? trimStartTime;  // in seconds, null means no trim
@@ -111,17 +113,19 @@ class VideoEdit {
     required this.textOverlays,
     required this.chapters,
     required this.captions,
+    List<DrawingStroke>? drawings,
     this.soundEdits,
     required this.lastModified,
     this.trimStartTime,
     this.trimEndTime,
-  });
+  }) : drawings = drawings ?? [];
 
   Map<String, dynamic> toJson() => {
     'videoId': videoId,
     'textOverlays': textOverlays.map((e) => e.toJson()).toList(),
     'chapters': chapters.map((e) => e.toJson()).toList(),
     'captions': captions.map((e) => e.toJson()).toList(),
+    'drawings': drawings.map((e) => e.toJson()).toList(),
     'soundEdits': soundEdits,
     'lastModified': Timestamp.fromDate(lastModified),
     'trimStartTime': trimStartTime,
@@ -138,6 +142,9 @@ class VideoEdit {
         .toList(),
     captions: (json['captions'] as List? ?? [])
         .map((e) => Caption.fromJson(e))
+        .toList(),
+    drawings: (json['drawings'] as List? ?? [])
+        .map((e) => DrawingStroke.fromJson(e))
         .toList(),
     soundEdits: json['soundEdits'],
     lastModified: (json['lastModified'] as Timestamp).toDate(),
