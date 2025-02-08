@@ -25,6 +25,10 @@ dependencies:
   media_kit_libs_video: ^1.0.4        # Native video dependencies
   visibility_detector: ^0.4.0+2
   
+  # AI and Audio Processing
+  dart_openai: ^5.1.0                 # OpenAI API client      # For audio extraction
+  path_provider: ^2.1.2
+  
   # Utils
   cupertino_icons: ^1.0.2
   go_router: ^13.0.0  # For navigation
@@ -33,7 +37,6 @@ dependencies:
   shared_preferences: ^2.2.2
   app_links: ^3.4.5
   path: ^1.8.3
-  path_provider: ^2.1.2  # For accessing system directories
   video_compress: ^3.1.2  # Add video compression package
   image_picker: ^1.0.7
   uuid: ^4.3.3  # Add UUID package

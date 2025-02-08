@@ -555,3 +555,232 @@ This hybrid approach combines the efficiency of traditional web crawling with AI
    - 95% relevant link suggestions
    - < 5s crawl time per query
    - 99.9% uptime 
+
+### AI Info Card Generation
+
+#### Overview
+Automated info card generation system that uses AI to analyze video content and create relevant, engaging info cards. The system combines speech-to-text, content analysis, and smart formatting to generate comprehensive info cards.
+
+#### Implementation Flow
+
+1. **Content Analysis Pipeline**:
+   ```typescript
+   interface ContentAnalysis {
+     // Speech to Text
+     transcription: {
+       text: string;
+       confidence: number;
+       timestamps: Array<{
+         word: string;
+         start: number;
+         end: number;
+       }>;
+     };
+     
+     // Content Understanding
+     analysis: {
+       mainTopic: string;
+       keyPoints: string[];
+       suggestedTitle: string;
+       relevantConcepts: string[];
+       technicalTerms: string[];
+     };
+     
+     // Info Card Generation
+     infoCard: {
+       title: string;
+       description: string;
+       bulletPoints: string[];
+       suggestedLinks: Array<{
+         url: string;
+         text: string;
+         relevance: number;
+       }>;
+     };
+   }
+   ```
+
+2. **API Integration Points**:
+   ```typescript
+   class AIInfoCardService {
+     // Speech to Text Processing
+     async function processAudio(videoUrl: string, timestamp: number): Promise<string> {
+       // 1. Extract audio segment around timestamp
+       const audioSegment = await extractAudioSegment(videoUrl, timestamp);
+       
+       // 2. Convert to text using Whisper
+       const transcription = await openai.audio.transcriptions.create({
+         file: audioSegment,
+         model: "whisper-1",
+         language: "en",
+         timestamp_granularities: ["word", "segment"]
+       });
+       
+       return transcription.text;
+     }
+     
+     // Content Analysis
+     async function analyzeContent(transcription: string): Promise<ContentAnalysis> {
+       const completion = await openai.chat.completions.create({
+         model: "gpt-4",
+         messages: [
+           {
+             role: "system",
+             content: "Analyze video content and generate an engaging info card."
+           },
+           {
+             role: "user",
+             content: `Generate an info card from this transcription: ${transcription}`
+           }
+         ],
+         response_format: { type: "json_object" }
+       });
+       
+       return JSON.parse(completion.choices[0].message.content);
+     }
+   }
+   ```
+
+3. **User Interface Flow**:
+   ```typescript
+   interface AIGenerationUI {
+     states: {
+       INITIAL: 'ready',
+       PROCESSING_AUDIO: 'processing_audio',
+       ANALYZING_CONTENT: 'analyzing_content',
+       GENERATING_CARD: 'generating_card',
+       COMPLETE: 'complete',
+       ERROR: 'error'
+     };
+     
+     userControls: {
+       generateButton: {
+         text: string;
+         isEnabled: boolean;
+       };
+       progressIndicator: {
+         progress: number;
+         stage: string;
+       };
+       editControls: {
+         isVisible: boolean;
+         fields: string[];
+       };
+     };
+   }
+   ```
+
+#### Processing Steps
+
+1. **Audio Processing**:
+   - Extract audio segment (±30 seconds around timestamp)
+   - Convert to required format (mp3/wav)
+   - Process through Whisper API
+   - Handle multiple languages
+
+2. **Content Analysis**:
+   - Identify main topic and key points
+   - Extract technical terms and concepts
+   - Generate concise description
+   - Create bullet points
+   - Suggest relevant links
+
+3. **Quality Assurance**:
+   - Verify transcription quality
+   - Check content relevance
+   - Validate generated card format
+   - Ensure link validity
+
+#### Error Handling
+
+1. **Audio Processing Errors**:
+   ```typescript
+   interface AudioProcessingError {
+     type: 'EXTRACTION' | 'CONVERSION' | 'API' | 'QUALITY';
+     message: string;
+     retryable: boolean;
+     suggestedAction?: string;
+   }
+   ```
+
+2. **Content Analysis Errors**:
+   ```typescript
+   interface ContentAnalysisError {
+     type: 'INSUFFICIENT_CONTENT' | 'LOW_CONFIDENCE' | 'API_ERROR';
+     message: string;
+     fallbackOption?: 'manual_entry' | 'partial_generation';
+   }
+   ```
+
+#### Performance Optimization
+
+1. **Caching Strategy**:
+   ```typescript
+   interface CacheConfig {
+     transcriptions: {
+       ttl: number;  // Time to live in seconds
+       maxSize: number;  // Max cache size in MB
+     };
+     analyses: {
+       ttl: number;
+       maxSize: number;
+     };
+   }
+   ```
+
+2. **Resource Management**:
+   - Implement request queuing
+   - Batch similar requests
+   - Cache common responses
+   - Optimize audio segments
+
+#### Cost Estimates
+
+1. **API Usage**:
+   - Whisper API: ~$0.006 per minute
+   - GPT-4: ~$0.03 per generation
+   - Total per card: ~$0.04-0.06
+
+2. **Optimization Potential**:
+   - Caching: 30-40% cost reduction
+   - Batching: 20-30% cost reduction
+   - Smart segmentation: 15-25% cost reduction
+
+#### Implementation Phases
+
+1. **Phase 1: Basic Integration**
+   - Implement Whisper integration
+   - Basic GPT-4 content analysis
+   - Simple UI for generation
+
+2. **Phase 2: Enhanced Analysis**
+   - Add advanced content analysis
+   - Implement link suggestions
+   - Improve error handling
+
+3. **Phase 3: Optimization**
+   - Add caching system
+   - Implement batching
+   - Optimize resource usage
+
+4. **Phase 4: Advanced Features**
+   - Multi-language support
+   - Custom templates
+   - Learning from user edits
+
+#### Success Metrics
+
+1. **Quality Metrics**:
+   - Transcription accuracy > 95%
+   - Content relevance score > 90%
+   - User edit rate < 20%
+
+2. **Performance Metrics**:
+   - Generation time < 5 seconds
+   - Error rate < 5%
+   - Cache hit rate > 40%
+
+3. **User Metrics**:
+   - Usage rate > 50%
+   - User satisfaction > 4.5/5
+   - Edit time reduction > 70% 

@@ -1115,6 +1115,43 @@ class _VideoEditorState extends State<VideoEditor> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Add AI Generate button at the top
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      // Show loading indicator
+                      showDialog(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (context) => const Center(
+                          child: CircularProgressIndicator(),
+                        ),
+                      );
+                      
+                      try {
+                        // TODO: Implement AI generation
+                        // For now, just close the loading dialog after a delay
+                        await Future.delayed(const Duration(seconds: 1));
+                        Navigator.pop(context); // Close loading dialog
+                      } catch (e) {
+                        Navigator.pop(context); // Close loading dialog
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error generating content: $e'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Generate with AI'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
                 TextField(
                   decoration: const InputDecoration(
                     labelText: 'Title',
