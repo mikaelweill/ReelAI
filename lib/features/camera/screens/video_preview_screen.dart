@@ -93,6 +93,13 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
       // Pause video during upload
       await _player.pause();
       
+      // Get video dimensions and calculate aspect ratio
+      final width = _player.state.width ?? 1920;  // Default to 16:9 if null
+      final height = _player.state.height ?? 1080;
+      final aspectRatio = width / height;
+      print('Video dimensions: ${width}x${height}');
+      print('Calculated aspect ratio: $aspectRatio');
+      
       // Track when the upload is complete
       bool uploadFinished = false;
       String? videoId = await _uploadService.uploadVideo(
@@ -100,6 +107,7 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
         title: metadata.title,
         description: metadata.description,
         isPrivate: metadata.isPrivate,
+        aspectRatio: aspectRatio,
         onProgress: (progress) {
           if (!mounted) return; // Safety check
           
@@ -178,7 +186,7 @@ class _VideoPreviewScreenState extends State<VideoPreviewScreen> {
             // Video Preview
             Center(
               child: AspectRatio(
-                aspectRatio: 16 / 9, // Default aspect ratio, will adjust to video
+                aspectRatio: (_player.state.width ?? 1920) / (_player.state.height ?? 1080),
                 child: Video(controller: _controller),
               ),
             ),

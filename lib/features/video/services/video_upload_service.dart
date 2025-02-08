@@ -18,6 +18,7 @@ class VideoUploadService {
     required String title,
     String? description,
     required bool isPrivate,
+    required double aspectRatio,
     Function(double)? onProgress,
   }) async {
     File? compressedFile;
@@ -83,6 +84,7 @@ class VideoUploadService {
         'createdAt': FieldValue.serverTimestamp(),
         'status': 'ready',
         'size': snapshot.totalBytes,
+        'aspectRatio': aspectRatio,
       });
 
       print('Upload complete. Video ID: ${docRef.id}');
@@ -233,11 +235,18 @@ class VideoUploadService {
       
       // Upload to Firebase
       print('\nStarting Firebase upload...');
+      final width = selectedStream.videoResolution.width;
+      final height = selectedStream.videoResolution.height;
+      print('\nVideo dimensions: ${width}x${height}');
+      final aspectRatio = width / height;
+      print('Calculated aspect ratio: $aspectRatio');
+      
       final videoId = await uploadVideo(
         filePath: tempPath,
         title: video.title,
         description: video.description,
         isPrivate: false,
+        aspectRatio: aspectRatio,
         onProgress: (progress) {
           onProgress?.call(0.5 + (progress * 0.5));
         },

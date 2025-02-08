@@ -50,7 +50,7 @@ class Video {
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       duration: data['duration'] as int? ?? 0,
       size: data['size'] as int? ?? 0,
-      aspectRatio: (data['aspectRatio'] as num?)?.toDouble() ?? 16/9,
+      aspectRatio: (data['aspectRatio'] as num?)?.toDouble() ?? 9/16,
       status: data['status'] as String? ?? 'ready',
     );
   }
