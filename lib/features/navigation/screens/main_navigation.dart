@@ -6,6 +6,7 @@ import '../../camera/screens/camera_screen.dart';
 import '../../video/screens/upload_screen.dart';
 import '../../auth/services/auth_service.dart';
 import '../../studio/screens/studio_screen.dart';
+import '../../video/services/video_upload_service.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -80,6 +81,108 @@ class _MainNavigationState extends State<MainNavigation> {
                   ),
                 );
               },
+            ),
+            ListTile(
+              leading: const Icon(Icons.youtube_searched_for, color: Colors.white, size: 32),
+              title: const Text(
+                'Import from YouTube',
+                style: TextStyle(color: Colors.white, fontSize: 18),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _showYouTubeImportDialog();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showYouTubeImportDialog() {
+    final urlController = TextEditingController();
+    bool isLoading = false;
+    double progress = 0;
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Import from YouTube'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: urlController,
+                decoration: const InputDecoration(
+                  labelText: 'YouTube URL',
+                  hintText: 'https://youtube.com/...',
+                ),
+              ),
+              if (isLoading) ...[
+                const SizedBox(height: 16),
+                LinearProgressIndicator(value: progress),
+                const SizedBox(height: 8),
+                Text(
+                  '${(progress * 100).toStringAsFixed(1)}%',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: isLoading ? null : () async {
+                final url = urlController.text.trim();
+                if (url.isEmpty) return;
+                
+                setState(() {
+                  isLoading = true;
+                  progress = 0;
+                });
+                
+                try {
+                  final videoId = await VideoUploadService().importYoutubeVideo(
+                    url,
+                    onProgress: (p) {
+                      setState(() => progress = p);
+                    },
+                  );
+                  
+                  if (videoId != null) {
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Video imported successfully!'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  } else {
+                    throw Exception('Failed to import video');
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: $e'),
+                        backgroundColor: Colors.red,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  }
+                } finally {
+                  if (context.mounted) {
+                    setState(() => isLoading = false);
+                  }
+                }
+              },
+              child: const Text('Import'),
             ),
           ],
         ),

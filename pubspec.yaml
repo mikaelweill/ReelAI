@@ -33,11 +33,13 @@ dependencies:
   shared_preferences: ^2.2.2
   app_links: ^3.4.5
   path: ^1.8.3
+  path_provider: ^2.1.2  # For accessing system directories
   video_compress: ^3.1.2  # Add video compression package
   image_picker: ^1.0.7
   uuid: ^4.3.3  # Add UUID package
   perfect_freehand: ^2.3.1  # Drawing functionality
   url_launcher: ^6.2.5  # For launching URLs
+  youtube_explode_dart: ^2.3.9
 
 dev_dependencies:
   flutter_test:

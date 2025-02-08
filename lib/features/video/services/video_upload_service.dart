@@ -3,7 +3,9 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
 import 'video_compression_service.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 class VideoUploadService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
@@ -123,6 +125,142 @@ class VideoUploadService {
     } catch (e) {
       print('Error deleting video: $e');
       rethrow;
+    }
+  }
+
+  Future<String?> importYoutubeVideo(String url, {Function(double)? onProgress}) async {
+    final yt = YoutubeExplode();
+    File? videoFile;
+    
+    try {
+      print('Processing YouTube video: $url');
+      
+      // Get video details
+      final video = await yt.videos.get(url);
+      print('\nVideo Info:');
+      print('Title: ${video.title}');
+      print('Duration: ${video.duration}');
+      print('Author: ${video.author}');
+      
+      // Get manifest and log available streams
+      print('\nFetching video manifest...');
+      final manifest = await yt.videos.streamsClient.getManifest(url);
+      
+      print('\nAll available streams:');
+      print('Muxed streams (video+audio):');
+      manifest.muxed.forEach((stream) {
+        print('- ${stream.videoQuality}, ${stream.size.totalMegaBytes.toStringAsFixed(2)}MB, ${stream.container}');
+      });
+      
+      print('\nVideo-only streams:');
+      manifest.videoOnly.forEach((stream) {
+        print('- ${stream.videoQuality}, ${stream.size.totalMegaBytes.toStringAsFixed(2)}MB, ${stream.container}');
+      });
+      
+      // Combine both muxed and video-only streams
+      final allStreams = [...manifest.muxed, ...manifest.videoOnly]
+        .where((s) => s.videoQuality.toString().contains('720') || 
+                     s.videoQuality.toString().contains('480') ||
+                     s.videoQuality.toString().contains('360'))
+        .toList();
+      
+      print('\nFiltered streams (720p or lower):');
+      allStreams.forEach((stream) {
+        print('- ${stream.videoQuality}, ${stream.size.totalMegaBytes.toStringAsFixed(2)}MB, ${stream.container}');
+      });
+      
+      if (allStreams.isEmpty) {
+        throw Exception('No suitable video streams found after filtering for 720p or lower');
+      }
+      
+      // Sort by quality and log
+      allStreams.sort((a, b) {
+        // Extract resolution numbers (e.g., "720p" -> 720)
+        final aRes = int.tryParse(a.videoQuality.toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+        final bRes = int.tryParse(b.videoQuality.toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+        return bRes.compareTo(aRes);
+      });
+      
+      print('\nSorted streams (highest quality first):');
+      allStreams.forEach((stream) {
+        print('- ${stream.videoQuality}, ${stream.size.totalMegaBytes.toStringAsFixed(2)}MB, ${stream.container}');
+      });
+      
+      // Select stream and log selection criteria
+      print('\nAttempting to select stream under 10MB...');
+      final selectedStream = allStreams
+        .firstWhere(
+          (s) => s.size.totalMegaBytes <= 10,
+          orElse: () {
+            print('No streams under 10MB found, selecting smallest available stream');
+            return allStreams.reduce((a, b) => 
+              a.size.totalBytes < b.size.totalBytes ? a : b
+            );
+          },
+        );
+      
+      print('\nSelected stream for download:');
+      print('Quality: ${selectedStream.videoQuality}');
+      print('Size: ${selectedStream.size.totalMegaBytes.toStringAsFixed(2)}MB');
+      print('Container: ${selectedStream.container}');
+      print('Bitrate: ${selectedStream.bitrate}');
+      
+      // Create temporary file
+      final tempDir = await getTemporaryDirectory();
+      final tempPath = path.join(tempDir.path, '${video.id}.mp4');
+      videoFile = File(tempPath);
+      
+      // Download the video
+      print('\nStarting download to: $tempPath');
+      final fileStream = await yt.videos.streamsClient.get(selectedStream);
+      final fileLength = selectedStream.size.totalBytes;
+      var downloaded = 0;
+      
+      final output = videoFile.openWrite();
+      
+      await for (final data in fileStream) {
+        output.add(data);
+        downloaded += data.length;
+        final progress = downloaded / fileLength;
+        onProgress?.call(progress * 0.5); // First 50% is download
+        if (downloaded % (fileLength ~/ 10) == 0) {  // Log every 10%
+          print('Download progress: ${(progress * 100).toStringAsFixed(1)}%');
+        }
+      }
+      
+      await output.close();
+      print('Download complete! File size: ${(await videoFile.length()) / (1024 * 1024)}MB');
+      
+      // Upload to Firebase
+      print('\nStarting Firebase upload...');
+      final videoId = await uploadVideo(
+        filePath: tempPath,
+        title: video.title,
+        description: video.description,
+        isPrivate: false,
+        onProgress: (progress) {
+          onProgress?.call(0.5 + (progress * 0.5));
+        },
+      );
+      
+      return videoId;
+      
+    } catch (e, stackTrace) {
+      print('Error importing YouTube video:');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
+      return null;
+    } finally {
+      yt.close();
+      // Clean up temp file
+      try {
+        if (videoFile != null && await videoFile.exists()) {
+          await videoFile.delete();
+          print('Cleaned up temporary file');
+        }
+      } catch (e) {
+        print('Warning: Could not clean up temporary file: $e');
+      }
     }
   }
 } 
