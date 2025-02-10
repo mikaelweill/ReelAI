@@ -7,12 +7,13 @@ import io
 import logging
 import requests
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from pydantic import BaseModel
 from openai import OpenAI
 from firebase_admin import initialize_app, firestore, storage
 from firebase_functions import https_fn
+import urllib.parse
 
 # Initialize Firebase Admin
 initialize_app()
@@ -30,7 +31,6 @@ class Transcript(BaseModel):
     """Transcript model for video transcriptions."""
     video_id: str
     content: str
-    created_at: datetime = datetime.utcnow()
     status: str = "completed"  # completed, failed
     error: Optional[str] = None
 
@@ -40,27 +40,49 @@ class Transcript(BaseModel):
             datetime: lambda v: v.isoformat()
         }
 
-def get_video_url(video_id: str) -> str:
-    """Get the video URL from Firebase Storage.
+def get_video_stream(video_id: str) -> tuple[io.BufferedReader, str]:
+    """Get a direct read stream for a video from Firebase Storage.
     
     Args:
-        video_id: The ID of the video in Storage
+        video_id: The ID of the video document in Firestore
         
     Returns:
-        str: The video URL
+        tuple: (file stream, content type)
         
     Raises:
         Exception: If video is not found
     """
+    logger.info(f"Getting video stream for ID: {video_id}")
+    db = firestore.client()
+    video_doc = db.collection('videos').document(video_id).get()
+    
+    if not video_doc.exists:
+        raise Exception(f'Video document {video_id} not found in Firestore')
+        
+    video_data = video_doc.to_dict()
+    video_url = video_data.get('videoUrl')
+    if not video_url:
+        raise Exception(f'Video URL not found in document {video_id}')
+    
+    # Extract storage path from URL
+    # URL format: https://firebasestorage.googleapis.com/v0/b/BUCKET/o/videos%2FUID%2FFILENAME?alt=...
+    storage_path = video_url.split('/o/')[1].split('?')[0]
+    storage_path = urllib.parse.unquote(storage_path)
+    logger.info(f"Extracted storage path: {storage_path}")
+    
+    # Get direct read stream using Admin SDK
     bucket = storage.bucket()
-    logger.info(f"Looking for video: videos/{video_id}")
-    blob = bucket.blob(f'videos/{video_id}')
+    blob = bucket.blob(storage_path)
     
     if not blob.exists():
-        logger.error(f"Video {video_id} not found at path: videos/{video_id}")
-        raise Exception(f'Video {video_id} not found in storage')
-        
-    return blob.generate_signed_url(expiration=300)  # URL valid for 5 minutes
+        raise Exception(f'Video blob not found at path: {storage_path}')
+    
+    # Create a temporary file-like object in memory
+    stream = io.BytesIO()
+    blob.download_to_file(stream)
+    stream.seek(0)  # Reset to start of stream
+    
+    return stream, blob.content_type
 
 def create_transcript_for_video(video_id: str) -> Transcript:
     """Create a transcript for a video using Whisper API.
@@ -85,23 +107,18 @@ def create_transcript_for_video(video_id: str) -> Transcript:
         return Transcript(**transcript_doc.to_dict())
     
     try:
-        # Get video URL from Firebase Storage
-        logger.info(f"Getting video URL from storage: {video_id}")
-        video_url = get_video_url(video_id)
-        
-        # Stream the video data efficiently
-        logger.info("Streaming video data")
-        response = requests.get(video_url, stream=True)
-        response.raise_for_status()
+        # Get video stream directly from Firebase Storage
+        logger.info(f"Getting video stream from storage: {video_id}")
+        video_stream, content_type = get_video_stream(video_id)
         
         # Initialize OpenAI client with API key from config
         logger.info("Initializing OpenAI client")
         client = OpenAI(api_key=openai_api_key)
         
-        # Transcribe with Whisper using the streamed data
+        # Transcribe with Whisper using the direct stream
         logger.info("Starting Whisper transcription")
         transcription = client.audio.transcriptions.create(
-            file=('video.mp4', response.raw),  # Pass the raw stream
+            file=('video.mp4', video_stream),
             model="whisper-1",
             response_format="text"
         )
@@ -114,24 +131,25 @@ def create_transcript_for_video(video_id: str) -> Transcript:
             status="completed"
         )
         
-        # Save to Firestore
-        logger.info("Saving transcript to Firestore")
-        transcript_ref.set(transcript.model_dump())
+        # Save to Firestore ONLY on success
+        logger.info("Saving successful transcript to Firestore")
+        transcript_ref.set({
+            'video_id': video_id,
+            'content': transcription,
+            'status': 'completed'
+        })
         
         return transcript
             
     except Exception as e:
         logger.error(f"Failed to create transcript for video {video_id}", exc_info=True)
-        # Create failed transcript
-        transcript = Transcript(
+        # Return failed transcript but DON'T save it
+        return Transcript(
             video_id=video_id,
             content="",
             status="failed",
             error=str(e)
         )
-        logger.info("Saving failed transcript status to Firestore")
-        transcript_ref.set(transcript.model_dump())
-        raise e
 
 @https_fn.on_request()
 def create_transcript(request: https_fn.Request) -> https_fn.Response:
@@ -280,3 +298,24 @@ def generate_info_card(request: https_fn.Request) -> https_fn.Response:
 # @https_fn.on_request()
 # def on_request_example(req: https_fn.Request) -> https_fn.Response:
 #     return https_fn.Response("Hello world!")
+
+def generate_signed_url(storage_path: str) -> str:
+    """Generate a signed URL for accessing a video in Firebase Storage.
+    
+    Args:
+        storage_path: The path to the video in Firebase Storage
+        
+    Returns:
+        str: The generated signed URL
+    """
+    # Get a fresh download URL using the Admin SDK
+    bucket = storage.bucket()
+    blob = bucket.blob(storage_path)
+    fresh_url = blob.generate_signed_url(
+        version="v4",
+        expiration=timedelta(minutes=15),
+        method="GET"
+    )
+    
+    logger.info(f"Generated fresh download URL for video")
+    return fresh_url
