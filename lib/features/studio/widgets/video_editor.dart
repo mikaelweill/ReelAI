@@ -9,6 +9,10 @@ import '../models/interactive_overlay.dart';
 import 'drawing_painter.dart';
 import 'dart:async';
 import 'dart:math';
+import '../services/ai_service.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 
 class TrimRegionPainter extends CustomPainter {
   final double? trimStart;
@@ -1115,30 +1119,56 @@ class _VideoEditorState extends State<VideoEditor> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Add AI Generate button at the top
+                // AI Generation button
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.only(bottom: 16.0),
                   child: ElevatedButton.icon(
                     onPressed: () async {
-                      // Show loading indicator
-                      showDialog(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (context) => const Center(
-                          child: CircularProgressIndicator(),
-                        ),
+                      // Initialize AI service
+                      final aiService = AIService();
+                      
+                      // Get video ID from widget
+                      final videoId = widget.video.id;
+                      print('Processing video ID: $videoId');
+
+                      // Transcribe video
+                      final transcription = await aiService.transcribeVideo(
+                        videoId,
+                        onProgress: (status) {
+                          // Update loading dialog with status
+                          if (context.mounted) {
+                            Navigator.pop(context);
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (context) => AlertDialog(
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const CircularProgressIndicator(),
+                                    const SizedBox(height: 16),
+                                    Text(status),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+                        },
                       );
                       
-                      try {
-                        // TODO: Implement AI generation
-                        // For now, just close the loading dialog after a delay
-                        await Future.delayed(const Duration(seconds: 1));
-                        Navigator.pop(context); // Close loading dialog
-                      } catch (e) {
-                        Navigator.pop(context); // Close loading dialog
+                      // Generate info card content
+                      final content = await aiService.generateInfoCard(transcription);
+                      
+                      // Update text fields with generated content
+                      title = content['title'] ?? '';
+                      description = content['description'] ?? '';
+
+                      // Close loading dialog and show success message
+                      if (context.mounted) {
+                        Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Error generating content: $e'),
+                          const SnackBar(
+                            content: Text('Content generated successfully!'),
                             behavior: SnackBarBehavior.floating,
                           ),
                         );
@@ -1157,6 +1187,10 @@ class _VideoEditorState extends State<VideoEditor> {
                     labelText: 'Title',
                     hintText: 'Enter card title',
                   ),
+                  controller: TextEditingController(text: title)
+                    ..selection = TextSelection.fromPosition(
+                      TextPosition(offset: title.length),
+                    ),
                   onChanged: (value) => title = value,
                 ),
                 const SizedBox(height: 16),
@@ -1165,6 +1199,10 @@ class _VideoEditorState extends State<VideoEditor> {
                     labelText: 'Description',
                     hintText: 'Enter description',
                   ),
+                  controller: TextEditingController(text: description)
+                    ..selection = TextSelection.fromPosition(
+                      TextPosition(offset: description.length),
+                    ),
                   maxLines: 3,
                   onChanged: (value) => description = value,
                 ),
@@ -1202,18 +1240,21 @@ class _VideoEditorState extends State<VideoEditor> {
                     bulletPoints: bulletPoints,
                     linkUrl: linkUrl,
                     linkText: linkText,
-                    startTime: 0,  // Always 0 for global cards
-                    endTime: double.infinity,  // Always infinity for global cards
-                    position: const Offset(0, 0),  // Not used for global cards
+                    startTime: _currentPosition,  // Start at current position
+                    endTime: double.infinity,     // Show until the end
+                    position: const Offset(0.5, 0.5),  // Center of the screen
+                    dotColor: Colors.blue,
+                    dotSize: 12.0,
                   );
                   
                   setState(() {
                     _videoEdit?.interactiveOverlays.add(infoCard);
-                    _currentInfoCard = infoCard;
                   });
                   
-                  Navigator.pop(context);
                   await _saveVideoEdit();
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                  }
                 }
               },
               child: const Text('Add'),

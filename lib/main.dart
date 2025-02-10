@@ -16,18 +16,19 @@ void main() async {
     await Firebase.initializeApp();
     print('Firebase initialized successfully');
     
-    // Initialize App Check
-    await FirebaseAppCheck.instance.activate(
-      webProvider: ReCaptchaV3Provider('recaptcha-v3-site-key'),
-      androidProvider: AndroidProvider.debug,
-      appleProvider: AppleProvider.debug,
-    );
-    print('App Check initialized successfully');
+    // // Initialize App Check
+    // await FirebaseAppCheck.instance.activate(
+    //   webProvider: ReCaptchaV3Provider('recaptcha-v3-site-key'),
+    //   androidProvider: AndroidProvider.debug,
+    //   appleProvider: AppleProvider.debug,
+    // );
+    // print('App Check initialized successfully');
+    
   } catch (e) {
     if (e.toString().contains('duplicate-app')) {
       print('Firebase already initialized');
     } else {
-      print('Firebase initialization error: $e');
+      print('Initialization error: $e');
       rethrow;
     }
   }

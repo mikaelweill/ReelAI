@@ -31,6 +31,10 @@ env/
 .python-version
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
+.Python
+src/
 
 # IntelliJ related
 *.iml
@@ -49,8 +53,8 @@ __pycache__/
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
+.flutter-plugins*
+.flutter-plugins-dependencies*
 .packages
 .pub-cache/
 .pub/
@@ -131,11 +135,11 @@ firebase_options.dart
 **/ios/.generated/
 **/ios/Flutter/App.framework
 **/ios/Flutter/Flutter.framework
-**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/Generated*.xcconfig
 **/ios/Flutter/app.flx
 **/ios/Flutter/app.zip
 **/ios/Flutter/flutter_assets/
-**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/flutter_export_environment*.sh
 **/ios/ServiceDefinitions.json
 **/ios/Runner/GeneratedPluginRegistrant.*
 
@@ -186,3 +190,14 @@ lcov.info
 # Keep these files
 !pubspec.lock
 !ios/Podfile.lock
+
+# Metadata
+.metadata
+
+# Build configurations
+android/gradle/wrapper/gradle-wrapper.properties
+.gcloudignore
+linux/flutter/CMakeLists.txt
+
+# Generated files
+pubspec.lock
