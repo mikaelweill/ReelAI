@@ -35,6 +35,7 @@ class AIService {
       
       onProgress?.call('Processing transcription...');
       final data = json.decode(response.body);
+      print('Response data: $data');
       
       if (data['success'] == true && data['transcript'] != null) {
         final transcript = data['transcript'];
@@ -68,6 +69,7 @@ class AIService {
       }
       
       final data = json.decode(response.body);
+      print('Response data: $data');
       
       if (data['success'] == true && data['content'] != null) {
         return {
