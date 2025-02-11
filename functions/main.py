@@ -319,3 +319,8 @@ def generate_signed_url(storage_path: str) -> str:
     
     logger.info(f"Generated fresh download URL for video")
     return fresh_url
+
+@https_fn.on_request()
+def test(request: https_fn.Request) -> https_fn.Response:
+    """Simple test function."""
+    return https_fn.Response(json={'success': True})
