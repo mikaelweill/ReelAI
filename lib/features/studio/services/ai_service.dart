@@ -15,8 +15,52 @@ class AIService {
     print('OpenAI API initialized');
   }
 
+  Future<String?> convertVideoToAudio(String videoId, {Function(String status)? onProgress}) async {
+    try {
+      onProgress?.call('Converting video to audio...');
+      
+      print('Attempting to convert video to audio: $videoId');
+      
+      // Make direct HTTP call to the function
+      final response = await http.post(
+        Uri.parse('$_baseUrl/convert_to_audio'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'video_id': videoId}),
+      );
+      
+      if (response.statusCode != 200) {
+        print('Error response: ${response.body}');
+        throw Exception('Failed to call function: ${response.statusCode} ${response.body}');
+      }
+      
+      final data = json.decode(response.body);
+      print('Response data: $data');
+      
+      if (data['success'] == true && data['audio_url'] != null) {
+        onProgress?.call('Audio conversion complete!');
+        return data['audio_url'];
+      }
+      
+      throw Exception(data['error'] ?? 'Failed to convert video to audio');
+    } catch (e, stackTrace) {
+      print('Error in convertVideoToAudio:');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
+      onProgress?.call('Error: ${e.toString()}');
+      return null;
+    }
+  }
+
   Future<String> transcribeVideo(String videoId, {Function(String status)? onProgress}) async {
     try {
+      onProgress?.call('Starting audio conversion...');
+      
+      // First convert video to audio
+      final audioUrl = await convertVideoToAudio(videoId, onProgress: onProgress);
+      if (audioUrl == null) {
+        throw Exception('Failed to convert video to audio');
+      }
+      
       onProgress?.call('Starting transcription...');
       
       print('Attempting to transcribe video: $videoId');
@@ -25,7 +69,10 @@ class AIService {
       final response = await http.post(
         Uri.parse('$_baseUrl/create_transcript'),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'video_id': videoId}),
+        body: json.encode({
+          'video_id': videoId,
+          'audio_url': audioUrl
+        }),
       );
       
       if (response.statusCode != 200) {
