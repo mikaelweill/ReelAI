@@ -35,12 +35,16 @@ class AIService {
       
       final data = json.decode(response.body);
       print('Response data: $data');
+      print('Success: ${data['success']}, Audio Path: ${data['audio_path']}');
       
-      if (data['success'] == true && data['audio_url'] != null) {
+      if (data['success'] == true && data['audio_path'] != null) {
         onProgress?.call('Audio conversion complete!');
-        return data['audio_url'];
+        final path = data['audio_path'];
+        print('Returning audio path: $path');
+        return path;
       }
       
+      print('Throwing error because success=${data['success']} or audio_path=${data['audio_path']} is invalid');
       throw Exception(data['error'] ?? 'Failed to convert video to audio');
     } catch (e, stackTrace) {
       print('Error in convertVideoToAudio:');
@@ -56,8 +60,10 @@ class AIService {
       onProgress?.call('Starting audio conversion...');
       
       // First convert video to audio
-      final audioUrl = await convertVideoToAudio(videoId, onProgress: onProgress);
-      if (audioUrl == null) {
+      final audioPath = await convertVideoToAudio(videoId, onProgress: onProgress);
+      print('Received audio path from conversion: $audioPath');
+      if (audioPath == null) {
+        print('Audio path is null, throwing error');
         throw Exception('Failed to convert video to audio');
       }
       
@@ -71,7 +77,7 @@ class AIService {
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'video_id': videoId,
-          'audio_url': audioUrl
+          'audio_path': audioPath
         }),
       );
       
