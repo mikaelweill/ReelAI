@@ -256,14 +256,17 @@ class _VideoEditorState extends State<VideoEditor> {
     print('- Title: ${widget.video.title}');
     print('- URL: ${widget.video.videoUrl}');
     
-    print('\nVideoEdit details:');
+    print('\nVideoEdit details before save:');
     print('- VideoID: ${_videoEdit!.videoId}');
     print('- Number of chapters: ${_videoEdit!.chapters.length}');
-    print('- Chapters: ${_videoEdit!.chapters.map((c) => '${c.title}@${c.timestamp}s').join(', ')}');
-    print('- Trim Start: ${_videoEdit!.trimStartTime}');
-    print('- Trim End: ${_videoEdit!.trimEndTime}');
-    print('- Number of drawings: ${_strokes.length}');
-    print('- Drawings: ${_strokes.map((d) => 'id:${d.id} time:${d.startTime}-${d.endTime}s color:${d.color}').join('\n  ')}');
+    print('- Number of text overlays: ${_videoEdit!.textOverlays.length}');
+    print('- Number of interactive overlays: ${_videoEdit!.interactiveOverlays.length}');
+    print('- Interactive overlays content:');
+    for (var overlay in _videoEdit!.interactiveOverlays) {
+      print('  - ID: ${overlay.id}');
+      print('    Title: ${overlay.title}');
+      print('    Description length: ${overlay.description.length}');
+    }
 
     try {
       // Create a new VideoEdit with updated timestamp
@@ -283,10 +286,10 @@ class _VideoEditorState extends State<VideoEditor> {
           .collection('video_edits')
           .doc(widget.video.id);
           
-      print('\nSaving to Firestore:');
+      print('\nPreparing Firestore save:');
       print('- Collection: video_edits');
       print('- Document path: ${docRef.path}');
-      print('- Data to save: ${updatedEdit.toJson()}');
+      print('- Data to save (JSON): ${updatedEdit.toJson()}');
 
       await docRef.set(updatedEdit.toJson());
 
@@ -316,21 +319,24 @@ class _VideoEditorState extends State<VideoEditor> {
         );
       }
     } catch (e, stackTrace) {
-      print('\nError saving to Firestore:');
-      print('- Error: $e');
-      print('- Stack trace:\n$stackTrace');
+      print('\nError saving video edit:');
+      print('Error message: $e');
+      print('Stack trace: $stackTrace');
+      print('Last known state:');
+      print('- _videoEdit null? ${_videoEdit == null}');
+      print('- interactiveOverlays count: ${_videoEdit?.interactiveOverlays.length}');
       
       setState(() {
         _isSaving = false;
         _showSaveIndicator = false;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error saving changes: $e'),
+            content: Text('Failed to save changes: ${e.toString()}'),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 2),
+            duration: const Duration(seconds: 4),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -1094,11 +1100,37 @@ class _VideoEditorState extends State<VideoEditor> {
   void _addInfoCard() {
     // Check if a card already exists
     if (_videoEdit?.interactiveOverlays.isNotEmpty == true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Only one info card is allowed per video. Please edit or delete the existing card.'),
-          duration: Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
+      final existingCard = _videoEdit!.interactiveOverlays.first;
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Info Card Already Exists'),
+          content: const Text('Only one info card is allowed per video. Would you like to edit or delete the existing card?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _deleteInfoCard(existingCard);
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('Delete'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _editInfoCard(existingCard);
+              },
+              child: const Text('Edit'),
+            ),
+          ],
         ),
       );
       return;
@@ -1180,6 +1212,14 @@ class _VideoEditorState extends State<VideoEditor> {
                           showDialog(
                             context: context,
                             builder: (context) {
+                              // Set initial values from AI content
+                              title = content['title'] ?? '';
+                              description = content['description'] ?? '';
+                              
+                              print('Setting initial values from AI:');
+                              print('- Title: $title');
+                              print('- Description: ${description.substring(0, min(50, description.length))}...');
+                              
                               return AlertDialog(
                                 title: const Text('Add Info Card'),
                                 content: SingleChildScrollView(
@@ -1190,25 +1230,35 @@ class _VideoEditorState extends State<VideoEditor> {
                                         decoration: const InputDecoration(
                                           labelText: 'Title',
                                           hintText: 'Enter card title',
+                                          helperText: 'Maximum 100 characters',
                                         ),
-                                        controller: TextEditingController(text: content['title'] ?? '')
+                                        maxLength: 100,  // Add max length
+                                        controller: TextEditingController(text: title)
                                           ..selection = TextSelection.fromPosition(
-                                            TextPosition(offset: (content['title'] ?? '').length),
+                                            TextPosition(offset: title.length),
                                           ),
-                                        onChanged: (value) => title = value,
+                                        onChanged: (value) {
+                                          print('Title changed to: $value');
+                                          title = value;
+                                        },
                                       ),
                                       const SizedBox(height: 16),
                                       TextField(
                                         decoration: const InputDecoration(
                                           labelText: 'Description',
                                           hintText: 'Enter description',
+                                          helperText: 'Maximum 500 characters',
                                         ),
-                                        controller: TextEditingController(text: content['description'] ?? '')
-                                          ..selection = TextSelection.fromPosition(
-                                            TextPosition(offset: (content['description'] ?? '').length),
-                                          ),
                                         maxLines: 3,
-                                        onChanged: (value) => description = value,
+                                        maxLength: 500,  // Add max length
+                                        controller: TextEditingController(text: description)
+                                          ..selection = TextSelection.fromPosition(
+                                            TextPosition(offset: description.length),
+                                          ),
+                                        onChanged: (value) {
+                                          print('Description changed to: $value');
+                                          description = value;
+                                        },
                                       ),
                                       const SizedBox(height: 16),
                                       TextField(
@@ -1236,7 +1286,16 @@ class _VideoEditorState extends State<VideoEditor> {
                                   ),
                                   TextButton(
                                     onPressed: () async {
+                                      print('\n--- Add Info Card Button Pressed ---');
+                                      print('Current values:');
+                                      print('- Title: "$title"');
+                                      print('- Description: "${description.substring(0, min(50, description.length))}..."');
+                                      
                                       if (title.isNotEmpty && description.isNotEmpty) {
+                                        print('Title and description are valid:');
+                                        print('- Title: $title');
+                                        print('- Description length: ${description.length}');
+                                        
                                         final infoCard = InteractiveOverlay(
                                           id: _uuid.v4(),
                                           title: title,
@@ -1251,15 +1310,34 @@ class _VideoEditorState extends State<VideoEditor> {
                                           dotSize: 12.0,
                                         );
                                         
+                                        print('Created info card:');
+                                        print('- ID: ${infoCard.id}');
+                                        print('- Start Time: ${infoCard.startTime}');
+                                        
+                                        print('Current _videoEdit state:');
+                                        print('- Null? ${_videoEdit == null}');
+                                        print('- Current overlays count: ${_videoEdit?.interactiveOverlays.length}');
+                                        
                                         setState(() {
+                                          print('Setting state - adding info card');
                                           _videoEdit?.interactiveOverlays.add(infoCard);
+                                          print('New overlays count: ${_videoEdit?.interactiveOverlays.length}');
                                         });
                                         
-                                        await _saveVideoEdit();
+                                        print('Closing dialog');
                                         if (context.mounted) {
                                           Navigator.pop(context);
                                         }
+                                        
+                                        print('Calling _saveVideoEdit()');
+                                        await _saveVideoEdit();
+                                        print('Save completed');
+                                      } else {
+                                        print('Validation failed:');
+                                        print('- Title empty? ${title.isEmpty}');
+                                        print('- Description empty? ${description.isEmpty}');
                                       }
+                                      print('--- End Add Info Card Button Press ---\n');
                                     },
                                     child: const Text('Add'),
                                   ),
@@ -1271,8 +1349,8 @@ class _VideoEditorState extends State<VideoEditor> {
 
                         // Show success message
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
                               content: Text('Info card content generated successfully!'),
                               duration: Duration(seconds: 2),
                               behavior: SnackBarBehavior.floating,
@@ -1308,11 +1386,10 @@ class _VideoEditorState extends State<VideoEditor> {
                     labelText: 'Title',
                     hintText: 'Enter card title',
                   ),
-                  controller: TextEditingController(text: title)
-                    ..selection = TextSelection.fromPosition(
-                      TextPosition(offset: title.length),
-                    ),
-                  onChanged: (value) => title = value,
+                  onChanged: (value) {
+                    print('Title changed to: $value');
+                    title = value;
+                  },
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -1320,12 +1397,11 @@ class _VideoEditorState extends State<VideoEditor> {
                     labelText: 'Description',
                     hintText: 'Enter description',
                   ),
-                  controller: TextEditingController(text: description)
-                    ..selection = TextSelection.fromPosition(
-                      TextPosition(offset: description.length),
-                    ),
                   maxLines: 3,
-                  onChanged: (value) => description = value,
+                  onChanged: (value) {
+                    print('Description changed to: $value');
+                    description = value;
+                  },
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -1361,9 +1437,9 @@ class _VideoEditorState extends State<VideoEditor> {
                     bulletPoints: bulletPoints,
                     linkUrl: linkUrl,
                     linkText: linkText,
-                    startTime: _currentPosition,  // Start at current position
-                    endTime: double.infinity,     // Show until the end
-                    position: const Offset(0.5, 0.5),  // Center of the screen
+                    startTime: _currentPosition,
+                    endTime: double.infinity,
+                    position: const Offset(0.5, 0.5),
                     dotColor: Colors.blue,
                     dotSize: 12.0,
                   );
@@ -1402,6 +1478,114 @@ class _VideoEditorState extends State<VideoEditor> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Add AI Generation button
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16.0),
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      // Initialize AI service
+                      final aiService = AIService();
+                      
+                      // Get video ID from widget
+                      final videoId = widget.video.id;
+                      print('Processing video ID: $videoId');
+
+                      // Show initial loading dialog
+                      String currentStatus = 'Starting...';
+                      if (context.mounted) {
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (dialogContext) => StatefulBuilder(
+                            builder: (context, setDialogState) {
+                              return AlertDialog(
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const CircularProgressIndicator(),
+                                    const SizedBox(height: 16),
+                                    Text(currentStatus),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        );
+                      }
+
+                      try {
+                        // Process video and generate info card
+                        final content = await aiService.processVideoAndGenerateInfoCard(
+                          videoId,
+                          onProgress: (status) {
+                            if (context.mounted) {
+                              setState(() {
+                                currentStatus = status;
+                              });
+                            }
+                          },
+                        );
+
+                        // Close loading dialog
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                        }
+
+                        // Update the variables with generated content
+                        title = content['title'] ?? title;
+                        description = content['description'] ?? description;
+
+                        // Close and reopen dialog with new content
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          _editInfoCard(InteractiveOverlay(
+                            id: existingCard.id,
+                            title: title,
+                            description: description,
+                            bulletPoints: bulletPoints,
+                            linkUrl: linkUrl,
+                            linkText: linkText,
+                            startTime: existingCard.startTime,
+                            endTime: existingCard.endTime,
+                            position: existingCard.position,
+                            dotColor: existingCard.dotColor,
+                            dotSize: existingCard.dotSize,
+                          ));
+                        }
+
+                        // Show success message
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Info card content generated successfully!'),
+                              duration: Duration(seconds: 2),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        print('Error generating info card: $e');
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error: ${e.toString()}'),
+                              backgroundColor: Colors.red,
+                              duration: const Duration(seconds: 3),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.auto_awesome),
+                    label: const Text('Generate with AI'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                      foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
                 TextField(
                   controller: TextEditingController(text: title)
                     ..selection = TextSelection.fromPosition(
@@ -1411,7 +1595,10 @@ class _VideoEditorState extends State<VideoEditor> {
                     labelText: 'Title',
                     hintText: 'Enter card title',
                   ),
-                  onChanged: (value) => title = value,
+                  onChanged: (value) {
+                    print('Title changed to: $value');
+                    title = value;
+                  },
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -1422,12 +1609,12 @@ class _VideoEditorState extends State<VideoEditor> {
                   decoration: const InputDecoration(
                     labelText: 'Description',
                     hintText: 'Enter description',
+                    helperText: 'Maximum 500 characters',
                   ),
                   maxLines: 3,
+                  maxLength: 500,  // Add max length
                   onChanged: (value) => description = value,
                 ),
-                const SizedBox(height: 16),
-                // Bullet points section will be added here
                 const SizedBox(height: 16),
                 TextField(
                   controller: TextEditingController(text: linkUrl ?? '')
@@ -1465,8 +1652,8 @@ class _VideoEditorState extends State<VideoEditor> {
                 if (title.isNotEmpty && description.isNotEmpty) {
                   final updatedCard = InteractiveOverlay(
                     id: existingCard.id,
-                    title: title,
-                    description: description,
+                    title: title.substring(0, min(title.length, 100)),  // Limit title length
+                    description: description.substring(0, min(description.length, 500)),  // Limit description length
                     bulletPoints: bulletPoints,
                     linkUrl: linkUrl,
                     linkText: linkText,
