@@ -1,0 +1,26 @@
+steps:
+- name: 'gcr.io/cloud-builders/gcloud'
+  args:
+  - functions
+  - deploy
+  - convert_to_audio
+  - --runtime=python311
+  - --trigger-http
+  - --allow-unauthenticated
+  - --memory=256MB
+  - --timeout=540s
+  - --source=.
+  - --entry-point=convert_to_audio
+
+- name: 'gcr.io/cloud-builders/gcloud'
+  args:
+  - functions
+  - deploy
+  - create_transcript
+  - --runtime=python311
+  - --trigger-http
+  - --allow-unauthenticated
+  - --memory=256MB
+  - --timeout=540s
+  - --source=.
+  - --entry-point=create_transcript 
