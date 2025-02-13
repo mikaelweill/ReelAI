@@ -24,7 +24,7 @@ load_dotenv()
 # Initialize Firebase Admin and OpenAI
 initialize_app()
 
-# Add strict version check and initialization
+# Add version check and initialization
 try:
     print("Starting OpenAI initialization and version checks...")
     
@@ -37,22 +37,12 @@ try:
         raise ImportError(f"OpenAI version {openai_version} is not compatible. Required version: 0.28.x")
     print("✓ Version check passed")
     
-    # Only set API key if version check passes
+    # Set API key if available
     openai.api_key = os.getenv('OPENAI_API_KEY')
     if not openai.api_key:
-        print("✗ API key not found in environment")
-        raise ValueError("OpenAI API key not found in environment variables")
-    print("✓ API key configured")
-    
-    # Verify we can access the old-style API
-    print("Verifying OpenAI API structure...")
-    if not hasattr(openai, 'Audio'):
-        print("✗ openai.Audio not found")
-        raise ImportError("OpenAI Audio module not available")
-    if not hasattr(openai.Audio, 'transcribe'):
-        print("✗ openai.Audio.transcribe not found")
-        raise ImportError("OpenAI Audio.transcribe method not available")
-    print("✓ API structure verification passed")
+        print("⚠️ OpenAI API key not found in environment - will need to be set before using OpenAI functions")
+    else:
+        print("✓ API key configured")
     
     print("OpenAI initialization completed successfully")
         
@@ -336,6 +326,27 @@ def create_transcript(request: https_fn.Request) -> https_fn.Response:
                 status=400
             )
 
+        # Check if transcript already exists in Firestore
+        db = firestore.client()
+        transcript_ref = db.collection('transcripts').document(video_id)
+        transcript_doc = transcript_ref.get()
+        
+        if transcript_doc.exists:
+            print(f"Transcript already exists for video {video_id}")
+            transcript_data = transcript_doc.to_dict()
+            return https_fn.Response(
+                response=json.dumps({
+                    "success": True,
+                    "transcript": {
+                        "content": transcript_data.get('content'),
+                        "videoId": video_id,
+                        "audioFileSize": transcript_data.get('audioFileSize'),
+                        "transcriptLength": transcript_data.get('transcriptLength')
+                    },
+                    "skipped_transcription": True
+                })
+            )
+
         # Get audio file from storage
         bucket = storage.bucket()
         audio_path = f'audio/{video_id}.mp3'
@@ -420,3 +431,100 @@ def create_transcript(request: https_fn.Request) -> https_fn.Response:
         # Clean up
         if temp_dir and os.path.exists(temp_dir):
             shutil.rmtree(temp_dir, ignore_errors=True)
+
+@https_fn.on_request()
+def generate_info_card(request: https_fn.Request) -> https_fn.Response:
+    """Generate title and description for an info card based on a transcript."""
+    try:
+        # Get transcript from request
+        data = request.get_json()
+        transcript = data.get('transcript')
+        
+        if not transcript:
+            return https_fn.Response(
+                response=json.dumps({"error": "No transcript provided"}),
+                status=400
+            )
+
+        print("Starting OpenAI title and description generation...")
+
+        # Create the prompt for GPT-3.5
+        prompt = f"""Based on the following transcript, generate a title and description for a video info card.
+        Keep the title under 100 characters and the description under 500 characters.
+        Format the response as JSON with 'title' and 'description' fields.
+        
+        Transcript:
+        {transcript}"""
+
+        # Call OpenAI API
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that generates concise and engaging video titles and descriptions."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=300
+        )
+        print("OpenAI generation completed")
+
+        # Parse the response
+        try:
+            content = response.choices[0].message.content
+            info_card = json.loads(content)
+            
+            # Validate the response format
+            if not isinstance(info_card, dict) or 'title' not in info_card or 'description' not in info_card:
+                raise ValueError("Invalid response format")
+                
+            return https_fn.Response(
+                response=json.dumps({
+                    "success": True,
+                    "title": info_card['title'],
+                    "description": info_card['description']
+                }),
+                status=200
+            )
+            
+        except (json.JSONDecodeError, ValueError) as e:
+            # If JSON parsing fails, try to extract title and description using string manipulation
+            content = response.choices[0].message.content
+            try:
+                # Attempt to parse the content as a string
+                lines = content.split('\n')
+                title = next(line.split(': ', 1)[1].strip(' "\'') for line in lines if 'title' in line.lower())
+                description = next(line.split(': ', 1)[1].strip(' "\'') for line in lines if 'description' in line.lower())
+                
+                return https_fn.Response(
+                    response=json.dumps({
+                        "success": True,
+                        "title": title,
+                        "description": description
+                    }),
+                    status=200
+                )
+            except Exception as inner_e:
+                return https_fn.Response(
+                    response=json.dumps({
+                        "error": f"Failed to parse OpenAI response: {str(inner_e)}",
+                        "raw_response": content
+                    }),
+                    status=500
+                )
+                
+    except Exception as e:
+        print(f"Error in generate_info_card: {str(e)}")
+        print(f"Error type: {type(e)}")
+        return https_fn.Response(
+            response=json.dumps({
+                "error": f"Error generating info card: {str(e)}"
+            }),
+            status=500
+        )
+
+if __name__ == "__main__":
+    from functions_framework import create_app
+    target_function = os.environ.get("FUNCTION_TARGET", "convert_to_audio")
+    app = create_app(target=target_function)
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)

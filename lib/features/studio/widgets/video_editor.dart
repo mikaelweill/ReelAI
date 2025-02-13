@@ -1131,47 +1131,168 @@ class _VideoEditorState extends State<VideoEditor> {
                       final videoId = widget.video.id;
                       print('Processing video ID: $videoId');
 
-                      // Transcribe video
-                      final transcription = await aiService.transcribeVideo(
-                        videoId,
-                        onProgress: (status) {
-                          // Update loading dialog with status
-                          if (context.mounted) {
-                            Navigator.pop(context);
-                            showDialog(
-                              context: context,
-                              barrierDismissible: false,
-                              builder: (context) => AlertDialog(
+                      // Show initial loading dialog
+                      String currentStatus = 'Starting...';
+                      if (context.mounted) {
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (dialogContext) => StatefulBuilder(
+                            builder: (context, setDialogState) {
+                              return AlertDialog(
                                 content: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     const CircularProgressIndicator(),
                                     const SizedBox(height: 16),
-                                    Text(status),
+                                    Text(currentStatus),
                                   ],
                                 ),
-                              ),
-                            );
-                          }
-                        },
-                      );
-                      
-                      // Generate info card content
-                      final content = await aiService.generateInfoCard(transcription);
-                      
-                      // Update text fields with generated content
-                      title = content['title'] ?? '';
-                      description = content['description'] ?? '';
-
-                      // Close loading dialog and show success message
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Content generated successfully!'),
-                            behavior: SnackBarBehavior.floating,
+                              );
+                            },
                           ),
                         );
+                      }
+
+                      try {
+                        // Process video and generate info card
+                        final content = await aiService.processVideoAndGenerateInfoCard(
+                          videoId,
+                          onProgress: (status) {
+                            // Update dialog status
+                            if (context.mounted) {
+                              setState(() {
+                                currentStatus = status;
+                              });
+                            }
+                          },
+                        );
+
+                        // Close loading dialog
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                        }
+
+                        // Update text fields with generated content
+                        if (context.mounted) {
+                          Navigator.pop(context); // Close the current dialog
+                          // Reopen dialog with populated content
+                          showDialog(
+                            context: context,
+                            builder: (context) {
+                              return AlertDialog(
+                                title: const Text('Add Info Card'),
+                                content: SingleChildScrollView(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      TextField(
+                                        decoration: const InputDecoration(
+                                          labelText: 'Title',
+                                          hintText: 'Enter card title',
+                                        ),
+                                        controller: TextEditingController(text: content['title'] ?? '')
+                                          ..selection = TextSelection.fromPosition(
+                                            TextPosition(offset: (content['title'] ?? '').length),
+                                          ),
+                                        onChanged: (value) => title = value,
+                                      ),
+                                      const SizedBox(height: 16),
+                                      TextField(
+                                        decoration: const InputDecoration(
+                                          labelText: 'Description',
+                                          hintText: 'Enter description',
+                                        ),
+                                        controller: TextEditingController(text: content['description'] ?? '')
+                                          ..selection = TextSelection.fromPosition(
+                                            TextPosition(offset: (content['description'] ?? '').length),
+                                          ),
+                                        maxLines: 3,
+                                        onChanged: (value) => description = value,
+                                      ),
+                                      const SizedBox(height: 16),
+                                      TextField(
+                                        decoration: const InputDecoration(
+                                          labelText: 'Link URL (optional)',
+                                          hintText: 'Enter URL',
+                                        ),
+                                        onChanged: (value) => linkUrl = value.isEmpty ? null : value,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      TextField(
+                                        decoration: const InputDecoration(
+                                          labelText: 'Link Text (optional)',
+                                          hintText: 'Enter link text',
+                                        ),
+                                        onChanged: (value) => linkText = value.isEmpty ? null : value,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () async {
+                                      if (title.isNotEmpty && description.isNotEmpty) {
+                                        final infoCard = InteractiveOverlay(
+                                          id: _uuid.v4(),
+                                          title: title,
+                                          description: description,
+                                          bulletPoints: bulletPoints,
+                                          linkUrl: linkUrl,
+                                          linkText: linkText,
+                                          startTime: _currentPosition,
+                                          endTime: double.infinity,
+                                          position: const Offset(0.5, 0.5),
+                                          dotColor: Colors.blue,
+                                          dotSize: 12.0,
+                                        );
+                                        
+                                        setState(() {
+                                          _videoEdit?.interactiveOverlays.add(infoCard);
+                                        });
+                                        
+                                        await _saveVideoEdit();
+                                        if (context.mounted) {
+                                          Navigator.pop(context);
+                                        }
+                                      }
+                                    },
+                                    child: const Text('Add'),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        }
+
+                        // Show success message
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Info card content generated successfully!'),
+                              duration: Duration(seconds: 2),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        // Handle error
+                        print('Error generating info card: $e');
+                        if (context.mounted) {
+                          Navigator.pop(context);  // Close loading dialog
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error: ${e.toString()}'),
+                              backgroundColor: Colors.red,
+                              duration: const Duration(seconds: 3),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
                       }
                     },
                     icon: const Icon(Icons.auto_awesome),

@@ -38,7 +38,11 @@ class AIService {
       print('Success: ${data['success']}, Audio Path: ${data['audio_path']}');
       
       if (data['success'] == true && data['audio_path'] != null) {
-        onProgress?.call('Audio conversion complete!');
+        if (data['skipped_conversion'] == true) {
+          onProgress?.call('Using existing audio file...');
+        } else {
+          onProgress?.call('Audio conversion complete!');
+        }
         final path = data['audio_path'];
         print('Returning audio path: $path');
         return path;
@@ -57,9 +61,9 @@ class AIService {
 
   Future<String> transcribeVideo(String videoId, {Function(String status)? onProgress}) async {
     try {
-      onProgress?.call('Starting audio conversion...');
+      onProgress?.call('Processing video...');
       
-      // First convert video to audio
+      // First convert video to audio if needed
       final audioPath = await convertVideoToAudio(videoId, onProgress: onProgress);
       print('Received audio path from conversion: $audioPath');
       if (audioPath == null) {
@@ -67,7 +71,7 @@ class AIService {
         throw Exception('Failed to convert video to audio');
       }
       
-      onProgress?.call('Starting transcription...');
+      onProgress?.call('Getting transcript...');
       
       print('Attempting to transcribe video: $videoId');
       
@@ -77,7 +81,6 @@ class AIService {
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'video_id': videoId,
-          'audio_path': audioPath
         }),
       );
       
@@ -86,14 +89,17 @@ class AIService {
         throw Exception('Failed to call function: ${response.statusCode} ${response.body}');
       }
       
-      onProgress?.call('Processing transcription...');
       final data = json.decode(response.body);
       print('Response data: $data');
       
       if (data['success'] == true && data['transcript'] != null) {
         final transcript = data['transcript'];
         if (transcript['content'] != null && transcript['content'].isNotEmpty) {
-          onProgress?.call('Transcription complete!');
+          if (data['skipped_transcription'] == true) {
+            onProgress?.call('Using existing transcript...');
+          } else {
+            onProgress?.call('Transcription complete!');
+          }
           return transcript['content'];
         }
       }
@@ -110,11 +116,13 @@ class AIService {
 
   Future<Map<String, String>> generateInfoCard(String transcription) async {
     try {
+      print('Generating info card from transcript of length: ${transcription.length}');
+      
       // Make direct HTTP call to the function
       final response = await http.post(
         Uri.parse('$_baseUrl/generate_info_card'),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'transcription': transcription}),
+        body: json.encode({'transcript': transcription}),
       );
       
       if (response.statusCode != 200) {
@@ -124,10 +132,16 @@ class AIService {
       final data = json.decode(response.body);
       print('Response data: $data');
       
-      if (data['success'] == true && data['content'] != null) {
+      if (data['success'] == true && (data['title'] != null || data['description'] != null)) {
+        final title = data['title'] as String? ?? 'Generated Title';
+        final description = data['description'] as String? ?? 'Generated Description';
+        
+        print('Generated title: $title');
+        print('Generated description: $description');
+        
         return {
-          'title': data['content']['title'] as String? ?? 'Generated Title',
-          'description': data['content']['description'] as String? ?? 'Generated Description',
+          'title': title.replaceAll('",', ''),  // Clean up any extra quotes or commas
+          'description': description,
         };
       }
       
@@ -136,6 +150,27 @@ class AIService {
       print('Error in generateInfoCard:');
       print('Error: $e');
       print('Stack trace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  /// Complete flow to process a video and generate its info card
+  Future<Map<String, String>> processVideoAndGenerateInfoCard(String videoId, {Function(String status)? onProgress}) async {
+    try {
+      // First get the transcript
+      final transcript = await transcribeVideo(videoId, onProgress: onProgress);
+      
+      onProgress?.call('Generating title and description...');
+      
+      // Then generate the info card
+      final infoCard = await generateInfoCard(transcript);
+      
+      onProgress?.call('Done! Title and description generated successfully.');
+      
+      return infoCard;
+    } catch (e) {
+      print('Error in processVideoAndGenerateInfoCard: $e');
+      onProgress?.call('Error: ${e.toString()}');
       rethrow;
     }
   }
