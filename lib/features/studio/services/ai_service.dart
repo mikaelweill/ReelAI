@@ -59,7 +59,7 @@ class AIService {
     }
   }
 
-  Future<String> transcribeVideo(String videoId, {Function(String status)? onProgress}) async {
+  Future<Map<String, dynamic>> transcribeVideo(String videoId, {Function(String status)? onProgress}) async {
     try {
       onProgress?.call('Processing video...');
       
@@ -94,13 +94,16 @@ class AIService {
       
       if (data['success'] == true && data['transcript'] != null) {
         final transcript = data['transcript'];
-        if (transcript['content'] != null && transcript['content'].isNotEmpty) {
+        if (transcript['content'] != null) {
           if (data['skipped_transcription'] == true) {
             onProgress?.call('Using existing transcript...');
           } else {
             onProgress?.call('Transcription complete!');
           }
-          return transcript['content'];
+          return {
+            'content': transcript['content'],
+            'segments': transcript['segments'] ?? [],
+          };
         }
       }
       
@@ -163,7 +166,7 @@ class AIService {
       onProgress?.call('Generating title and description...');
       
       // Then generate the info card
-      final infoCard = await generateInfoCard(transcript);
+      final infoCard = await generateInfoCard(transcript['content']);
       
       onProgress?.call('Done! Title and description generated successfully.');
       

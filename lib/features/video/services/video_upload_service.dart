@@ -6,12 +6,14 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'video_compression_service.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import '../../studio/services/ai_service.dart';
 
 class VideoUploadService {
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final VideoCompressionService _compressionService = VideoCompressionService();
+  final AIService _aiService = AIService();
 
   Future<String?> uploadVideo({
     required String filePath,
@@ -88,6 +90,22 @@ class VideoUploadService {
       });
 
       print('Upload complete. Video ID: ${docRef.id}');
+
+      // Start transcription process
+      try {
+        print('Starting transcription process...');
+        _aiService.transcribeVideo(docRef.id, onProgress: (status) {
+          print('Transcription status: $status');
+        }).then((transcript) {
+          print('Transcription complete: ${transcript.length} characters');
+        }).catchError((error) {
+          print('Error during transcription: $error');
+          // Don't throw here - we don't want to fail the upload if transcription fails
+        });
+      } catch (e) {
+        print('Error initiating transcription: $e');
+        // Don't throw here - we don't want to fail the upload if transcription fails
+      }
 
       // Clean up compressed file
       try {

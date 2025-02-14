@@ -14,6 +14,7 @@ import subprocess
 from datetime import timedelta
 import openai
 from dotenv import load_dotenv
+import re
 
 # Load environment variables
 load_dotenv()
@@ -88,6 +89,40 @@ def stream_file_to_blob(source_path, blob, chunk_size=2*1024*1024):  # 2MB chunk
     """Stream a file to a blob in chunks to minimize memory usage."""
     with open(source_path, 'rb') as f:
         blob.upload_from_file(f)
+
+def parse_vtt(vtt_content):
+    """Parse VTT content into segments with timestamps."""
+    segments = []
+    lines = vtt_content.strip().split('\n')
+    current_segment = None
+    
+    for line in lines:
+        # Skip WebVTT header and empty lines
+        if line == 'WEBVTT' or not line.strip():
+            continue
+            
+        # Check for timestamp line (e.g., "00:00:00.000 --> 00:00:05.000")
+        timestamp_match = re.match(r'(\d{2}:\d{2}:\d{2}\.\d{3}) --> (\d{2}:\d{2}:\d{2}\.\d{3})', line)
+        if timestamp_match:
+            if current_segment:
+                segments.append(current_segment)
+            current_segment = {
+                'start': timestamp_match.group(1),
+                'end': timestamp_match.group(2),
+                'text': ''
+            }
+        # If we have a current segment and this isn't a timestamp line, it's text
+        elif current_segment is not None:
+            if current_segment['text']:
+                current_segment['text'] += ' ' + line
+            else:
+                current_segment['text'] = line
+
+    # Add the last segment if exists
+    if current_segment:
+        segments.append(current_segment)
+    
+    return segments
 
 @https_fn.on_request()
 def convert_to_audio(request: https_fn.Request) -> https_fn.Response:
@@ -253,6 +288,28 @@ def create_transcript(request: https_fn.Request) -> https_fn.Response:
                 status=400
             )
 
+        # Check if transcript already exists in Firestore
+        db = firestore.client()
+        transcript_ref = db.collection('transcripts').document(video_id)
+        transcript_doc = transcript_ref.get()
+        
+        if transcript_doc.exists:
+            print(f"Transcript already exists for video {video_id}")
+            transcript_data = transcript_doc.to_dict()
+            return https_fn.Response(
+                response=json.dumps({
+                    "success": True,
+                    "transcript": {
+                        "content": transcript_data.get('content'),
+                        "segments": transcript_data.get('segments', []),
+                        "videoId": video_id,
+                        "audioFileSize": transcript_data.get('audioFileSize'),
+                        "transcriptLength": transcript_data.get('transcriptLength')
+                    },
+                    "skipped_transcription": True
+                })
+            )
+
         # Get audio file from storage
         bucket = storage.bucket()
         audio_path = f'audio/{video_id}.mp3'
@@ -264,39 +321,79 @@ def create_transcript(request: https_fn.Request) -> https_fn.Response:
                 status=404
             )
 
-        # Download audio to temp file
+        # Reload blob to get latest metadata
+        audio_blob.reload()
+        
+        # Get file size before downloading
+        file_size = audio_blob.size
+        print(f"Audio file size: {file_size} bytes ({file_size/1024/1024:.2f}MB)")
+        
+        # Download audio to temp file using streaming
         audio_file_path = os.path.join(temp_dir, f'{video_id}.mp3')
-        audio_blob.download_to_filename(audio_file_path)
-
-        # Open and send to Whisper API
+        
+        # Stream download in chunks
+        chunk_size = 1024 * 1024  # 1MB chunks
+        with open(audio_file_path, 'wb') as f:
+            audio_blob.download_to_file(f)
+            f.flush()
+            os.fsync(f.fileno())  # Ensure all data is written to disk
+        
+        # Verify downloaded file size
+        downloaded_size = os.path.getsize(audio_file_path)
+        print(f"Downloaded file size: {downloaded_size} bytes ({downloaded_size/1024/1024:.2f}MB)")
+        
+        if downloaded_size != file_size:
+            raise Exception(f"File size mismatch. Expected: {file_size}, Got: {downloaded_size}")
+        
+        print("Starting OpenAI transcription...")
+        
+        # Open and send to Whisper API directly
         with open(audio_file_path, 'rb') as audio_file:
-            transcript = openai.Audio.transcribe(
+            response = openai.Audio.transcribe(
                 model="whisper-1",
                 file=audio_file,
-                response_format="text"
+                response_format="vtt",
+                timestamp_granularities=["word", "segment"]
             )
+        print("OpenAI transcription completed")
+        
+        # Parse VTT content to get segments with timestamps
+        segments = parse_vtt(response)
+        
+        # Extract full text content from segments
+        full_text = ' '.join(segment['text'] for segment in segments)
+        
+        # Get transcript length for logging
+        transcript_length = len(full_text) if full_text else 0
+        print(f"Transcript length: {transcript_length} characters")
+        print(f"Number of segments: {len(segments)}")
 
         # Save transcript to Firestore
-        db = firestore.client()
-        transcript_ref = db.collection('transcripts').document(video_id)
         transcript_ref.set({
-            'content': transcript,
+            'content': full_text,
+            'segments': segments,
             'videoId': video_id,
-            'createdAt': firestore.SERVER_TIMESTAMP
+            'createdAt': firestore.SERVER_TIMESTAMP,
+            'audioFileSize': file_size,
+            'transcriptLength': transcript_length
         })
 
         return https_fn.Response(
             response=json.dumps({
                 "success": True,
                 "transcript": {
-                    "content": transcript,
-                    "videoId": video_id
+                    "content": full_text,
+                    "segments": segments,
+                    "videoId": video_id,
+                    "audioFileSize": file_size,
+                    "transcriptLength": transcript_length
                 }
             })
         )
 
     except Exception as e:
         print(f"Error in create_transcript: {str(e)}")
+        print(f"Error type: {type(e)}")
         return https_fn.Response(
             response=json.dumps({"error": str(e)}),
             status=500

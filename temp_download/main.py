@@ -17,12 +17,47 @@ from dotenv import load_dotenv
 import pkg_resources
 import psutil
 import gc
+import re
 
 # Load environment variables
 load_dotenv()
 
 # Initialize Firebase Admin and OpenAI
 initialize_app()
+
+def parse_vtt(vtt_content):
+    """Parse VTT content into segments with timestamps."""
+    segments = []
+    lines = vtt_content.strip().split('\n')
+    current_segment = None
+    
+    for line in lines:
+        # Skip WebVTT header and empty lines
+        if line == 'WEBVTT' or not line.strip():
+            continue
+            
+        # Check for timestamp line (e.g., "00:00:00.000 --> 00:00:05.000")
+        timestamp_match = re.match(r'(\d{2}:\d{2}:\d{2}\.\d{3}) --> (\d{2}:\d{2}:\d{2}\.\d{3})', line)
+        if timestamp_match:
+            if current_segment:
+                segments.append(current_segment)
+            current_segment = {
+                'start': timestamp_match.group(1),
+                'end': timestamp_match.group(2),
+                'text': ''
+            }
+        # If we have a current segment and this isn't a timestamp line, it's text
+        elif current_segment is not None:
+            if current_segment['text']:
+                current_segment['text'] += ' ' + line
+            else:
+                current_segment['text'] = line
+
+    # Add the last segment if exists
+    if current_segment:
+        segments.append(current_segment)
+    
+    return segments
 
 # Add version check and initialization
 try:
@@ -386,22 +421,30 @@ def create_transcript(request: https_fn.Request) -> https_fn.Response:
         
         # Open and send to Whisper API directly
         with open(audio_file_path, 'rb') as audio_file:
-            transcript = openai.Audio.transcribe(
+            response = openai.Audio.transcribe(
                 model="whisper-1",
                 file=audio_file,
-                response_format="text"
+                response_format="vtt",
+                timestamp_granularities=["word", "segment"]
             )
         print("OpenAI transcription completed")
         
+        # Parse VTT content to get segments with timestamps
+        segments = parse_vtt(response)
+        
+        # Extract full text content from segments
+        full_text = ' '.join(segment['text'] for segment in segments)
+        
         # Get transcript length for logging
-        transcript_length = len(transcript) if transcript else 0
+        transcript_length = len(full_text) if full_text else 0
         print(f"Transcript length: {transcript_length} characters")
+        print(f"Number of segments: {len(segments)}")
+        print(f"First few segments: {segments[:2]}")  # Log first few segments for debugging
 
         # Save transcript to Firestore
-        db = firestore.client()
-        transcript_ref = db.collection('transcripts').document(video_id)
         transcript_ref.set({
-            'content': transcript,
+            'content': full_text,
+            'segments': segments,  # Make sure segments are included
             'videoId': video_id,
             'createdAt': firestore.SERVER_TIMESTAMP,
             'audioFileSize': file_size,
@@ -412,7 +455,8 @@ def create_transcript(request: https_fn.Request) -> https_fn.Response:
             response=json.dumps({
                 "success": True,
                 "transcript": {
-                    "content": transcript,
+                    "content": full_text,
+                    "segments": segments,  # Include segments in response
                     "videoId": video_id,
                     "audioFileSize": file_size,
                     "transcriptLength": transcript_length
