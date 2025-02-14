@@ -83,7 +83,17 @@ class _VideoCardState extends State<VideoCard> {
   }
 
   Future<void> _loadVideoEdit() async {
+    print('\n--- Loading Video Edit in Feed ---');
+    print('Video ID: ${widget.video.id}');
+    
     _feedService.getVideoEdits(widget.video.id).listen((videoEdit) {
+      print('\nReceived video edit:');
+      print('- Null? ${videoEdit == null}');
+      if (videoEdit != null) {
+        print('- Captions enabled? ${videoEdit.isCaptionsEnabled}');
+        print('- Number of captions: ${videoEdit.captions.length}');
+      }
+      
       if (mounted) {
         setState(() {
           _videoEdit = videoEdit;
@@ -328,6 +338,19 @@ class _VideoCardState extends State<VideoCard> {
     );
   }
 
+  String _getCurrentCaptionText() {
+    if (_videoEdit == null || _videoEdit!.captions.isEmpty) {
+      return '';
+    }
+
+    final currentCaption = _videoEdit!.captions.firstWhere(
+      (caption) => _currentPosition >= caption.startTime &&
+                   _currentPosition <= caption.startTime + caption.duration,
+      orElse: () => Caption(id: '', text: '', startTime: 0, duration: 0),
+    );
+    return currentCaption.text;
+  }
+
   @override
   Widget build(BuildContext context) {
     return VisibilityDetector(
@@ -473,37 +496,36 @@ class _VideoCardState extends State<VideoCard> {
                             size: Size.infinite,
                           ),
                         ),
-                      if (_videoEdit != null)
-                        ..._videoEdit!.textOverlays
-                            .where((overlay) =>
-                                overlay.startTime <= _currentPosition &&
-                                overlay.endTime >= _currentPosition)
-                            .map(
-                              (overlay) => Positioned(
-                                left: 0,
-                                right: 0,
-                                bottom: 50,
-                                child: Center(
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                                    child: Text(
-                                      overlay.text,
-                                      textAlign: TextAlign.center,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 24,
-                                        shadows: [
-                                          Shadow(
-                                            blurRadius: 4,
-                                            color: Colors.black,
-                                          ),
-                                        ],
-                                      ),
+                      // Add captions display
+                      if (_videoEdit?.isCaptionsEnabled == true && _videoEdit?.captions.isNotEmpty == true)
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 50,
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.5),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                _getCurrentCaptionText(),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  shadows: [
+                                    Shadow(
+                                      blurRadius: 4,
+                                      color: Colors.black,
                                     ),
-                                  ),
+                                  ],
                                 ),
                               ),
                             ),
+                          ),
+                        ),
                       GestureDetector(
                         onTap: () {
                           if (widget.player.state.playing) {
