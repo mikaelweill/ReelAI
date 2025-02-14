@@ -24,6 +24,7 @@ class _MainNavigationState extends State<MainNavigation> {
   
   final GlobalKey<FeedScreenState> _feedScreenKey = GlobalKey<FeedScreenState>();
   final GlobalKey<StudioScreenState> _studioScreenKey = GlobalKey<StudioScreenState>();
+  final GlobalKey<HomeScreenState> _homeScreenKey = GlobalKey<HomeScreenState>();
 
   @override
   void initState() {
@@ -198,6 +199,7 @@ class _MainNavigationState extends State<MainNavigation> {
     // Always pause videos when switching tabs
     _feedScreenKey.currentState?.pauseVideos();
     _studioScreenKey.currentState?.pauseVideos();
+    _homeScreenKey.currentState?.pauseVideos();
 
     // If it's the upload screen (index 1), we've already paused everything
     if (index == 1) {
@@ -236,7 +238,7 @@ class _MainNavigationState extends State<MainNavigation> {
           FeedScreen(key: _feedScreenKey),      // Public videos feed
           const SizedBox(),                     // Placeholder for camera
           StudioScreen(key: _studioScreenKey),  // Studio screen
-          HomeScreen(),                         // My videos (private + public)
+          HomeScreen(key: _homeScreenKey),      // My videos (private + public)
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(

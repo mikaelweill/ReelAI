@@ -10,6 +10,7 @@ class VideoFeed extends StatefulWidget {
   final bool allowDeletion;
   final VoidCallback? onVideoDeleted;
   final String? emptyMessage;
+  final bool shouldAutoPlay;
   
   const VideoFeed({
     super.key,
@@ -18,6 +19,7 @@ class VideoFeed extends StatefulWidget {
     this.allowDeletion = false,
     this.onVideoDeleted,
     this.emptyMessage,
+    this.shouldAutoPlay = true,
   });
 
   @override
@@ -130,7 +132,7 @@ class VideoFeedState extends State<VideoFeed> {
     final player = _players[videoUrl];
     if (player == null) return;
 
-    if (isVisible) {
+    if (isVisible && widget.shouldAutoPlay) {  // Only auto-play if shouldAutoPlay is true
       // Pause any currently playing video
       if (_currentlyPlayingUrl != null && _currentlyPlayingUrl != videoUrl) {
         final currentPlayer = _players[_currentlyPlayingUrl];

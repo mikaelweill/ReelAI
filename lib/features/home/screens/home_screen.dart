@@ -6,12 +6,20 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<HomeScreen> createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
   final VideoFeedService _feedService = VideoFeedService();
+  final GlobalKey<VideoFeedState> _videoFeedKey = GlobalKey<VideoFeedState>();
   String _currentFilter = 'all';  // Track current filter state
+
+  @override
+  bool get wantKeepAlive => true;
+
+  void pauseVideos() {
+    _videoFeedKey.currentState?.pauseAllVideos();
+  }
 
   // Get the filtered stream based on current filter
   Stream<List<Video>> _getFilteredVideos() {
@@ -28,6 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
       backgroundColor: Colors.black,
       body: Column(
@@ -64,10 +73,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           Expanded(
             child: VideoFeed(
+              key: _videoFeedKey,
               videoStream: _getFilteredVideos(),
               showPrivacyControls: true,
               allowDeletion: true,
               emptyMessage: 'No videos yet. Create your first video!',
+              shouldAutoPlay: false,
             ),
           ),
         ],
