@@ -9,12 +9,17 @@ class StudioScreen extends StatefulWidget {
   const StudioScreen({super.key});
 
   @override
-  State<StudioScreen> createState() => _StudioScreenState();
+  State<StudioScreen> createState() => StudioScreenState();
 }
 
-class _StudioScreenState extends State<StudioScreen> {
+class StudioScreenState extends State<StudioScreen> {
   final _firestore = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
+  final GlobalKey<VideoEditorState> _videoEditorKey = GlobalKey<VideoEditorState>();
+
+  void pauseVideos() {
+    _videoEditorKey.currentState?.pauseVideo();
+  }
   
   @override
   Widget build(BuildContext context) {

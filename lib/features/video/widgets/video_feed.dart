@@ -21,16 +21,24 @@ class VideoFeed extends StatefulWidget {
   });
 
   @override
-  State<VideoFeed> createState() => _VideoFeedState();
+  State<VideoFeed> createState() => VideoFeedState();
 }
 
-class _VideoFeedState extends State<VideoFeed> {
+class VideoFeedState extends State<VideoFeed> {
   final Map<String, Player> _players = {};
   final Map<String, mk.VideoController> _controllers = {};
   static const int _maxControllers = 3;
   String? _currentlyPlayingUrl;
   final Map<String, bool> _bufferingStates = {};
   final PageController _pageController = PageController();
+
+  void pauseAllVideos() {
+    // Pause all active players
+    for (var player in _players.values) {
+      player.pause();
+    }
+    _currentlyPlayingUrl = null;
+  }
 
   @override
   void dispose() {

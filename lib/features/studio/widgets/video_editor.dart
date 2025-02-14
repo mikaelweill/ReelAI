@@ -67,11 +67,11 @@ class VideoEditor extends StatefulWidget {
   });
 
   @override
-  State<VideoEditor> createState() => _VideoEditorState();
+  State<VideoEditor> createState() => VideoEditorState();
 }
 
-class _VideoEditorState extends State<VideoEditor> {
-  late Player _player;
+class VideoEditorState extends State<VideoEditor> {
+  Player? _player;
   late mk.VideoController _controller;
   late Future<void> _initializeVideoPlayerFuture;
   final _firestore = FirebaseFirestore.instance;
@@ -107,11 +107,15 @@ class _VideoEditorState extends State<VideoEditor> {
   // Add info card list state
   bool _isInfoCardListExpanded = false;
 
+  void pauseVideo() {
+    _player?.pause();
+  }
+
   @override
   void initState() {
     super.initState();
     _player = Player();
-    _controller = mk.VideoController(_player);
+    _controller = mk.VideoController(_player!);  // Use non-null assertion since we just initialized it
     _initializeVideoPlayerFuture = _initializePlayer();
     
     print('Initializing video edit with ID: ${widget.video.id}');
@@ -131,16 +135,16 @@ class _VideoEditorState extends State<VideoEditor> {
   }
 
   Future<void> _initializePlayer() async {
-    await _player.open(Media(widget.video.videoUrl));
-    await _player.setPlaylistMode(PlaylistMode.loop);
+    await _player!.open(Media(widget.video.videoUrl));
+    await _player!.setPlaylistMode(PlaylistMode.loop);
     
     // Set initial position to trim start if exists
     if (_videoEdit?.trimStartTime != null) {
-      await _player.seek(Duration(milliseconds: (_videoEdit!.trimStartTime! * 1000).round()));
+      await _player!.seek(Duration(milliseconds: (_videoEdit!.trimStartTime! * 1000).round()));
     }
     
     // Set up position listener
-    _player.stream.position.listen((position) {
+    _player!.stream.position.listen((position) {
       if (mounted) {
         final currentPos = position.inMilliseconds / 1000.0;  // Convert to seconds
         setState(() {
@@ -155,21 +159,21 @@ class _VideoEditorState extends State<VideoEditor> {
           if (trimEnd != null && currentPos >= trimEnd && _isPlaying) {
             // If we hit the trim end, loop back to trim start
             if (trimStart != null) {
-              _player.seek(Duration(milliseconds: (trimStart * 1000).round()));
+              _player!.seek(Duration(milliseconds: (trimStart * 1000).round()));
             } else {
               // If no trim start defined, go to beginning
-              _player.seek(Duration.zero);
+              _player!.seek(Duration.zero);
             }
           } else if (trimStart != null && currentPos < trimStart && _isPlaying) {
             // If somehow we're before trim start, seek to trim start
-            _player.seek(Duration(milliseconds: (trimStart * 1000).round()));
+            _player!.seek(Duration(milliseconds: (trimStart * 1000).round()));
           }
         }
       }
     });
     
     // Set up playing state listener
-    _player.stream.playing.listen((playing) {
+    _player!.stream.playing.listen((playing) {
       if (mounted) {
         setState(() {
           _isPlaying = playing;
@@ -549,7 +553,7 @@ class _VideoEditorState extends State<VideoEditor> {
                 _tempTrimEnd = values.end;
               });
               // Seek to the current trim position
-              _player.seek(Duration(milliseconds: (values.start * 1000).round()));
+              _player!.seek(Duration(milliseconds: (values.start * 1000).round()));
             },
           ),
         ),
@@ -604,20 +608,20 @@ class _VideoEditorState extends State<VideoEditor> {
     if (_videoEdit?.trimStartTime != null && 
         position.inMilliseconds < _videoEdit!.trimStartTime! * 1000) {
       // If seeking before trim start, snap to trim start
-      await _player.seek(Duration(milliseconds: (_videoEdit!.trimStartTime! * 1000).round()));
+      await _player!.seek(Duration(milliseconds: (_videoEdit!.trimStartTime! * 1000).round()));
     } else if (_videoEdit?.trimEndTime != null && 
                position.inMilliseconds > _videoEdit!.trimEndTime! * 1000) {
       // If seeking after trim end, snap to trim end
-      await _player.seek(Duration(milliseconds: (_videoEdit!.trimEndTime! * 1000).round()));
+      await _player!.seek(Duration(milliseconds: (_videoEdit!.trimEndTime! * 1000).round()));
     } else {
       // Otherwise seek to requested position
-      await _player.seek(position);
+      await _player!.seek(position);
     }
   }
 
   Widget _buildScrubber() {
-    final duration = _player.state.duration;
-    final position = _player.state.position;
+    final duration = _player!.state.duration;
+    final position = _player!.state.position;
     final totalMillis = duration.inMilliseconds.toDouble();
     
     // Get the effective trim points (either temporary or saved)
@@ -718,7 +722,7 @@ class _VideoEditorState extends State<VideoEditor> {
                             _tempTrimStart = values.start;
                             _tempTrimEnd = values.end;
                           });
-                          _player.seek(Duration(milliseconds: (values.start * 1000).round()));
+                          _player!.seek(Duration(milliseconds: (values.start * 1000).round()));
                         }
                       },
                     )
@@ -728,7 +732,7 @@ class _VideoEditorState extends State<VideoEditor> {
                       max: durationInSeconds,
                       onChanged: (value) {
                         final newPosition = Duration(milliseconds: (value * 1000).round());
-                        _player.seek(newPosition);  // Direct seek in normal mode
+                        _player!.seek(newPosition);  // Direct seek in normal mode
                       },
                     ),
               ),
@@ -792,7 +796,7 @@ class _VideoEditorState extends State<VideoEditor> {
 
   List<Widget> _buildChapterLabels(double totalDuration) {
     const double showThreshold = 0.05; // Show label when within 5% of chapter
-    final currentPos = _player.state.position.inMilliseconds.toDouble();
+    final currentPos = _player!.state.position.inMilliseconds.toDouble();
     
     return _videoEdit!.chapters.map((chapter) {
       final chapterPos = chapter.timestamp * 1000;
@@ -1007,7 +1011,7 @@ class _VideoEditorState extends State<VideoEditor> {
                     ],
                   ),
                   onTap: () {
-                    _player.seek(
+                    _player!.seek(
                       Duration(
                         milliseconds: (stroke.startTime * 1000).round(),
                       ),
@@ -1042,7 +1046,7 @@ class _VideoEditorState extends State<VideoEditor> {
                   Slider(
                     value: startTime,
                     min: 0,
-                    max: _player.state.duration.inMilliseconds / 1000 - duration,
+                    max: _player!.state.duration.inMilliseconds / 1000 - duration,
                     onChanged: (value) {
                       setDialogState(() {
                         startTime = value;
@@ -1095,7 +1099,7 @@ class _VideoEditorState extends State<VideoEditor> {
                     Navigator.pop(context);
                     await _saveVideoEdit();
                     // Seek to the new start time
-                    _player.seek(Duration(milliseconds: (startTime * 1000).round()));
+                    _player!.seek(Duration(milliseconds: (startTime * 1000).round()));
                   },
                   child: const Text('Save'),
                 ),
@@ -1828,7 +1832,7 @@ class _VideoEditorState extends State<VideoEditor> {
                     ],
                   ),
                   onTap: () {
-                    _player.seek(
+                    _player!.seek(
                       Duration(
                         milliseconds: (overlay.startTime * 1000).round(),
                       ),
@@ -2184,8 +2188,8 @@ class _VideoEditorState extends State<VideoEditor> {
                           setState(() {
                             _isPlaying = !_isPlaying;
                             _isPlaying
-                                ? _player.play()
-                                : _player.pause();
+                                ? _player!.play()
+                                : _player!.pause();
                           });
                         },
                       ),
@@ -2205,8 +2209,8 @@ class _VideoEditorState extends State<VideoEditor> {
                           setState(() {
                             _isPlaying = !_isPlaying;
                             _isPlaying
-                                ? _player.play()
-                                : _player.pause();
+                                ? _player!.play()
+                                : _player!.pause();
                           });
                         },
                       ),
@@ -2440,7 +2444,7 @@ class _VideoEditorState extends State<VideoEditor> {
                                             },
                                           ),
                                           onTap: () {
-                                            _player.seek(
+                                            _player!.seek(
                                               Duration(
                                                 milliseconds: (chapter.timestamp * 1000).round(),
                                               ),
@@ -2554,7 +2558,7 @@ class _VideoEditorState extends State<VideoEditor> {
   @override
   void dispose() {
     _saveIndicatorTimer?.cancel();
-    _player.dispose();
+    _player?.dispose();  // Use null-safe call
     super.dispose();
   }
 }

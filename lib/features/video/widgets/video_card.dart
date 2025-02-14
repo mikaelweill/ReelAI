@@ -83,17 +83,7 @@ class _VideoCardState extends State<VideoCard> {
   }
 
   Future<void> _loadVideoEdit() async {
-    print('\n--- Loading Video Edit in Feed ---');
-    print('Video ID: ${widget.video.id}');
-    
     _feedService.getVideoEdits(widget.video.id).listen((videoEdit) {
-      print('\nReceived video edit:');
-      print('- Null? ${videoEdit == null}');
-      if (videoEdit != null) {
-        print('- Captions enabled? ${videoEdit.isCaptionsEnabled}');
-        print('- Number of captions: ${videoEdit.captions.length}');
-      }
-      
       if (mounted) {
         setState(() {
           _videoEdit = videoEdit;

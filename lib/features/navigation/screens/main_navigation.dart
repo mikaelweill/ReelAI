@@ -20,6 +20,10 @@ class _MainNavigationState extends State<MainNavigation> {
   int _selectedIndex = 0;
   late List<CameraDescription> cameras;
   bool _isCameraInitialized = false;
+  int _previousIndex = 0;
+  
+  final GlobalKey<FeedScreenState> _feedScreenKey = GlobalKey<FeedScreenState>();
+  final GlobalKey<StudioScreenState> _studioScreenKey = GlobalKey<StudioScreenState>();
 
   @override
   void initState() {
@@ -191,14 +195,19 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 
   void _onItemTapped(int index) {
+    // Always pause videos when switching tabs
+    _feedScreenKey.currentState?.pauseVideos();
+    _studioScreenKey.currentState?.pauseVideos();
+
+    // If it's the upload screen (index 1), we've already paused everything
     if (index == 1) {
-      // Show upload options
       _showUploadOptions();
-    } else {
-      setState(() {
-        _selectedIndex = index;
-      });
     }
+
+    setState(() {
+      _previousIndex = _selectedIndex;
+      _selectedIndex = index;
+    });
   }
 
   @override
@@ -223,11 +232,11 @@ class _MainNavigationState extends State<MainNavigation> {
       ) : null,
       body: IndexedStack(
         index: _selectedIndex,
-        children: const [
-          FeedScreen(),      // Public videos feed
-          SizedBox(),        // Placeholder for camera
-          StudioScreen(),    // New Studio screen
-          HomeScreen(),      // My videos (private + public)
+        children: [
+          FeedScreen(key: _feedScreenKey),      // Public videos feed
+          const SizedBox(),                     // Placeholder for camera
+          StudioScreen(key: _studioScreenKey),  // Studio screen
+          HomeScreen(),                         // My videos (private + public)
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
