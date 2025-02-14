@@ -85,6 +85,8 @@ class _VideoEditorState extends State<VideoEditor> {
   bool _isDrawingsListExpanded = false;
   bool _isTrimMode = false;
   bool _isInfoCardMode = false;
+  bool _isCaptionsEnabled = false;
+  bool _isLoadingCaptions = false;
   InteractiveOverlay? _currentInfoCard;
   
   // Add save indicator state
@@ -1832,6 +1834,163 @@ class _VideoEditorState extends State<VideoEditor> {
     );
   }
 
+  Future<void> _loadTranscriptSegments() async {
+    setState(() {
+      _isLoadingCaptions = true;
+    });
+
+    try {
+      print('\n--- Loading Transcript Segments ---');
+      print('Video ID: ${widget.video.id}');
+      
+      final doc = await _firestore
+          .collection('transcripts')
+          .doc(widget.video.id)
+          .get();
+
+      print('Document exists? ${doc.exists}');
+      
+      if (!doc.exists) {
+        throw Exception('No transcript found for this video');
+      }
+
+      final data = doc.data()!;
+      
+      // Log the document structure
+      print('\nTranscript document structure:');
+      print('- Has content? ${data.containsKey('content')}');
+      print('- Has segments? ${data.containsKey('segments')}');
+      print('- Audio file size: ${data['audioFileSize']}');
+      
+      final segments = data['segments'] as List<dynamic>?;
+      if (segments == null) {
+        throw Exception('No segments array found in transcript');
+      }
+      
+      print('\nProcessing ${segments.length} segments');
+      
+      final captions = segments.map((segment) {
+        // Cast segment to Map<String, dynamic> and extract fields
+        final Map<String, dynamic> segmentMap = segment as Map<String, dynamic>;
+        final String start = segmentMap['start'] as String;
+        final String end = segmentMap['end'] as String;
+        final String text = segmentMap['text'] as String;
+        
+        // Parse timestamps
+        final startTime = _parseTimestamp(start);
+        final endTime = _parseTimestamp(end);
+        final duration = endTime - startTime;
+        
+        print('Segment: $start -> $end: "$text"');
+        
+        return Caption(
+          id: _uuid.v4(),
+          text: text,
+          startTime: startTime,
+          duration: duration,
+        );
+      }).toList();
+      
+      print('\nCreated ${captions.length} captions');
+      
+      setState(() {
+        _videoEdit = VideoEdit(
+          videoId: _videoEdit!.videoId,
+          textOverlays: _videoEdit!.textOverlays,
+          chapters: _videoEdit!.chapters,
+          captions: captions,
+          drawings: _strokes,
+          interactiveOverlays: _videoEdit!.interactiveOverlays,
+          lastModified: DateTime.now(),
+          trimStartTime: _videoEdit!.trimStartTime,
+          trimEndTime: _videoEdit!.trimEndTime,
+        );
+        _isCaptionsEnabled = true;
+      });
+
+      print('Updated VideoEdit with captions');
+      print('Captions enabled: $_isCaptionsEnabled');
+      print('Number of captions in VideoEdit: ${_videoEdit?.captions.length}');
+
+      await _saveVideoEdit();
+      print('Saved video edit to Firestore');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Captions loaded successfully'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e, stackTrace) {
+      print('Error loading transcript segments:');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading captions: ${e.toString()}'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingCaptions = false;
+        });
+      }
+    }
+  }
+
+  String _getCurrentCaptionText() {
+    if (_videoEdit == null || _videoEdit!.captions.isEmpty) {
+      print('No captions available: videoEdit null? ${_videoEdit == null}, captions empty? ${_videoEdit?.captions.isEmpty}');
+      return '';
+    }
+
+    try {
+      print('\nFinding caption for position: $_currentPosition');
+      print('Available captions:');
+      for (var caption in _videoEdit!.captions.take(3)) {
+        print('- start: ${caption.startTime}, end: ${caption.startTime + caption.duration}, text: "${caption.text}"');
+      }
+      if (_videoEdit!.captions.length > 3) {
+        print('... and ${_videoEdit!.captions.length - 3} more');
+      }
+
+      final currentCaption = _videoEdit!.captions.firstWhere(
+        (caption) {
+          final isMatch = _currentPosition >= caption.startTime &&
+                         _currentPosition <= caption.startTime + caption.duration;
+          if (isMatch) {
+            print('Found matching caption: "${caption.text}"');
+          }
+          return isMatch;
+        },
+        orElse: () {
+          print('No matching caption found for position $_currentPosition');
+          return Caption(id: '', text: '', startTime: 0, duration: 0);
+        },
+      );
+      return currentCaption.text;
+    } catch (e) {
+      print('Error getting current caption: $e');
+      return '';
+    }
+  }
+
+  double _parseTimestamp(String timestamp) {
+    // Parse timestamp in format "00:00:00.000"
+    final parts = timestamp.split(':');
+    final seconds = parts[2].split('.');
+    return (int.parse(parts[0]) * 3600) +  // Hours
+           (int.parse(parts[1]) * 60) +     // Minutes
+           int.parse(seconds[0]) +          // Seconds
+           (int.parse(seconds[1]) / 1000);  // Milliseconds
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1850,6 +2009,36 @@ class _VideoEditorState extends State<VideoEditor> {
                     alignment: Alignment.center,
                     children: [
                       mk.Video(controller: _controller),
+                      // Add captions display
+                      if (_isCaptionsEnabled && _videoEdit != null)
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 50,
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.5),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                _getCurrentCaptionText(),
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  shadows: [
+                                    Shadow(
+                                      blurRadius: 4,
+                                      color: Colors.black,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       // Add save indicator
                       if (_showSaveIndicator)
                         Positioned(
@@ -2057,6 +2246,34 @@ class _VideoEditorState extends State<VideoEditor> {
                           });
                         },
                       ),
+                      // Add CC toggle button
+                      if (_videoEdit!.captions.isEmpty)
+                        // Show load button when no captions exist
+                        IconButton(
+                          icon: _isLoadingCaptions
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.closed_caption),
+                          onPressed: _isLoadingCaptions ? null : _loadTranscriptSegments,
+                          tooltip: 'Load transcript as captions',
+                        )
+                      else
+                        // Show toggle button only when captions are loaded
+                        IconButton(
+                          icon: Icon(
+                            _isCaptionsEnabled ? Icons.closed_caption : Icons.closed_caption_outlined,
+                            color: _isCaptionsEnabled ? Colors.blue : null,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _isCaptionsEnabled = !_isCaptionsEnabled;
+                            });
+                          },
+                          tooltip: _isCaptionsEnabled ? 'Hide captions' : 'Show captions',
+                        ),
                     ],
                   ),
                 ),

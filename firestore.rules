@@ -24,6 +24,12 @@ service cloud.firestore {
       allow read, write: if true;  // Testing mode - allow all operations
     }
 
+    // Transcripts collection
+    match /transcripts/{videoId} {
+      allow read: if true;  // Allow anyone to read transcripts
+      allow write: if false;  // Only allow writes through Cloud Functions
+    }
+
     // Video enhancements collection
     match /video_enhancements/{videoId} {
       allow read: if true;  // Anyone can read enhancements
