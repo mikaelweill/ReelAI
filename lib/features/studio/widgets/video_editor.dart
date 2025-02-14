@@ -124,6 +124,7 @@ class _VideoEditorState extends State<VideoEditor> {
       drawings: [],  // Initialize empty drawings list
       interactiveOverlays: [], // Initialize empty interactive overlays
       lastModified: DateTime.now(),
+      isCaptionsEnabled: false,  // Add this
     );
     // Then load any existing edits
     _loadVideoEdit();
@@ -198,6 +199,7 @@ class _VideoEditorState extends State<VideoEditor> {
         setState(() {
           _videoEdit = VideoEdit.fromJson(data);
           _strokes = List.from(_videoEdit!.drawings);  // Load drawings from VideoEdit
+          _isCaptionsEnabled = data['isCaptionsEnabled'] ?? false;  // Add this line
           print('\nLoaded drawings from database:');
           print('- Number of drawings: ${_strokes.length}');
           print('- Drawings: ${_strokes.map((d) => 'id:${d.id} time:${d.startTime}-${d.endTime}s color:${d.color}').join('\n  ')}');
@@ -214,6 +216,7 @@ class _VideoEditorState extends State<VideoEditor> {
             drawings: [],  // Initialize empty drawings list
             interactiveOverlays: [], // Initialize empty interactive overlays
             lastModified: DateTime.now(),
+            isCaptionsEnabled: false,  // Add this
           );
           _strokes = [];  // Clear strokes
         });
@@ -230,6 +233,7 @@ class _VideoEditorState extends State<VideoEditor> {
           drawings: [],  // Initialize empty drawings list
           interactiveOverlays: [], // Initialize empty interactive overlays
           lastModified: DateTime.now(),
+          isCaptionsEnabled: false,  // Add this
         );
         _strokes = [];  // Clear strokes
       });
@@ -282,17 +286,19 @@ class _VideoEditorState extends State<VideoEditor> {
         lastModified: DateTime.now(),
         trimStartTime: _videoEdit!.trimStartTime,  // Include trim start
         trimEndTime: _videoEdit!.trimEndTime,      // Include trim end
+        isCaptionsEnabled: _isCaptionsEnabled,     // Add this line
       );
 
       final docRef = _firestore
           .collection('video_edits')
           .doc(widget.video.id);
           
-      print('\nPreparing Firestore save:');
-      print('- Collection: video_edits');
-      print('- Document path: ${docRef.path}');
-      print('- Data to save (JSON): ${updatedEdit.toJson()}');
-
+      print('\nJust before save:');
+      print('- _isCaptionsEnabled: $_isCaptionsEnabled');
+      print('- _videoEdit.isCaptionsEnabled: ${_videoEdit?.isCaptionsEnabled}');
+      print('- updatedEdit.isCaptionsEnabled: ${updatedEdit.isCaptionsEnabled}');
+      print('- JSON to save: ${updatedEdit.toJson()}');
+          
       await docRef.set(updatedEdit.toJson());
 
       print('\nSave successful!');
@@ -576,6 +582,7 @@ class _VideoEditorState extends State<VideoEditor> {
                     lastModified: DateTime.now(),
                     trimStartTime: _tempTrimStart,
                     trimEndTime: _tempTrimEnd,
+                    isCaptionsEnabled: _isCaptionsEnabled,  // Add this
                   );
                   setState(() {
                     _videoEdit = updatedEdit;
@@ -765,6 +772,7 @@ class _VideoEditorState extends State<VideoEditor> {
                         lastModified: DateTime.now(),
                         trimStartTime: _tempTrimStart,
                         trimEndTime: _tempTrimEnd,
+                        isCaptionsEnabled: _isCaptionsEnabled,  // Add this
                       );
                       setState(() {
                         _videoEdit = updatedEdit;
@@ -1904,6 +1912,7 @@ class _VideoEditorState extends State<VideoEditor> {
           lastModified: DateTime.now(),
           trimStartTime: _videoEdit!.trimStartTime,
           trimEndTime: _videoEdit!.trimEndTime,
+          isCaptionsEnabled: true,  // Add this field
         );
         _isCaptionsEnabled = true;
       });
@@ -2268,9 +2277,32 @@ class _VideoEditorState extends State<VideoEditor> {
                             color: _isCaptionsEnabled ? Colors.blue : null,
                           ),
                           onPressed: () {
+                            print('\n--- Toggling Captions ---');
+                            print('Before toggle:');
+                            print('- _isCaptionsEnabled: $_isCaptionsEnabled');
+                            print('- _videoEdit?.isCaptionsEnabled: ${_videoEdit?.isCaptionsEnabled}');
+                            
                             setState(() {
                               _isCaptionsEnabled = !_isCaptionsEnabled;
+                              _videoEdit = VideoEdit(
+                                videoId: _videoEdit!.videoId,
+                                textOverlays: _videoEdit!.textOverlays,
+                                chapters: _videoEdit!.chapters,
+                                captions: _videoEdit!.captions,
+                                drawings: _strokes,
+                                interactiveOverlays: _videoEdit!.interactiveOverlays,
+                                lastModified: DateTime.now(),
+                                trimStartTime: _videoEdit!.trimStartTime,
+                                trimEndTime: _videoEdit!.trimEndTime,
+                                isCaptionsEnabled: _isCaptionsEnabled,  // Add this field
+                              );
                             });
+                            
+                            print('\nAfter toggle:');
+                            print('- _isCaptionsEnabled: $_isCaptionsEnabled');
+                            print('- _videoEdit?.isCaptionsEnabled: ${_videoEdit?.isCaptionsEnabled}');
+                            
+                            _saveVideoEdit();  // Save the change to Firestore
                           },
                           tooltip: _isCaptionsEnabled ? 'Hide captions' : 'Show captions',
                         ),

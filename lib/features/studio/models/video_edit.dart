@@ -109,6 +109,7 @@ class VideoEdit {
   final DateTime lastModified;
   final double? trimStartTime;  // in seconds, null means no trim
   final double? trimEndTime;    // in seconds, null means no trim
+  final bool isCaptionsEnabled;
 
   VideoEdit({
     required this.videoId,
@@ -121,6 +122,7 @@ class VideoEdit {
     required this.lastModified,
     this.trimStartTime,
     this.trimEndTime,
+    this.isCaptionsEnabled = false,
   }) : drawings = drawings ?? [],
        interactiveOverlays = interactiveOverlays ?? [];
 
@@ -135,6 +137,7 @@ class VideoEdit {
     'lastModified': Timestamp.fromDate(lastModified),
     'trimStartTime': trimStartTime,
     'trimEndTime': trimEndTime,
+    'isCaptionsEnabled': isCaptionsEnabled,
   };
 
   factory VideoEdit.fromJson(Map<String, dynamic> json) => VideoEdit(
@@ -158,5 +161,6 @@ class VideoEdit {
     lastModified: (json['lastModified'] as Timestamp).toDate(),
     trimStartTime: json['trimStartTime']?.toDouble(),
     trimEndTime: json['trimEndTime']?.toDouble(),
+    isCaptionsEnabled: json['isCaptionsEnabled'] ?? false,
   );
 } 
