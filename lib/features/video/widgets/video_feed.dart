@@ -33,6 +33,59 @@ class VideoFeedState extends State<VideoFeed> {
   String? _currentlyPlayingUrl;
   final Map<String, bool> _bufferingStates = {};
   final PageController _pageController = PageController();
+  int _currentPageIndex = 0;
+  List<Video> _videos = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController.addListener(_onPageChanged);
+  }
+
+  void _onPageChanged() {
+    final page = _pageController.page?.round() ?? 0;
+    if (page != _currentPageIndex && mounted) {
+      setState(() {
+        _currentPageIndex = page;
+      });
+    }
+  }
+
+  void _performSearch(String query, List<Video> videos) {
+    if (_currentPageIndex >= videos.length) return;
+    
+    final currentVideo = videos[_currentPageIndex];
+    final player = _players[currentVideo.videoUrl];
+    if (player == null) return;
+
+    // Get video edit for current video
+    final videoEdit = VideoFeedService().getVideoEdits(currentVideo.id).first;
+    videoEdit.then((edit) {
+      if (edit == null || edit.captions.isEmpty) {
+        print('No captions found for video ${currentVideo.id}');
+        return;
+      }
+
+      if (query.isEmpty) {
+        print('Empty query');
+        return;
+      }
+
+      // Search through captions
+      final matches = edit.captions.where(
+        (caption) => caption.text.toLowerCase().contains(query.toLowerCase())
+      ).toList();
+
+      print('Found ${matches.length} matches in video ${currentVideo.id}');
+      
+      if (matches.isNotEmpty) {
+        // Jump to first match
+        final firstMatch = matches.first;
+        player.seek(Duration(milliseconds: (firstMatch.startTime * 1000).round()));
+        print('Jumped to ${firstMatch.startTime}s: "${firstMatch.text}"');
+      }
+    });
+  }
 
   void pauseAllVideos() {
     // Pause all active players
@@ -180,92 +233,120 @@ class VideoFeedState extends State<VideoFeed> {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<Video>>(
-      stream: widget.videoStream,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(
-            child: Text(
-              'Error: ${snapshot.error}',
-              style: const TextStyle(color: Colors.white),
+    return Column(
+      children: [
+        // Search Box
+        Container(
+          padding: const EdgeInsets.all(16),
+          color: Colors.black,
+          child: TextField(
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Search in current video...',
+              hintStyle: const TextStyle(color: Colors.white70),
+              prefixIcon: const Icon(Icons.search, color: Colors.white70),
+              filled: true,
+              fillColor: Colors.grey[900],
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
-          );
-        }
+            onChanged: (query) {
+              _performSearch(query, _videos);
+            },
+          ),
+        ),
+        // Video Feed
+        Expanded(
+          child: StreamBuilder<List<Video>>(
+            stream: widget.videoStream,
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return Center(
+                  child: Text(
+                    'Error: ${snapshot.error}',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                );
+              }
 
-        if (!snapshot.hasData) {
-          return const Center(
-            child: CircularProgressIndicator(color: Colors.white),
-          );
-        }
+              if (!snapshot.hasData) {
+                return const Center(
+                  child: CircularProgressIndicator(color: Colors.white),
+                );
+              }
 
-        final videos = snapshot.data!;
-        if (videos.isEmpty) {
-          return Center(
-            child: Text(
-              widget.emptyMessage ?? 'No videos available',
-              style: const TextStyle(color: Colors.white),
-            ),
-          );
-        }
+              _videos = snapshot.data!;
+              if (_videos.isEmpty) {
+                return Center(
+                  child: Text(
+                    widget.emptyMessage ?? 'No videos available',
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                );
+              }
 
-        return SizedBox.expand(
-          child: PageView.builder(
-            scrollDirection: Axis.vertical,
-            controller: _pageController,
-            itemCount: videos.length,
-            itemBuilder: (context, index) {
-              final video = videos[index];
-              
-              return FutureBuilder<mk.VideoController?>(
-                future: _getController(video.videoUrl),
-                builder: (context, controllerSnapshot) {
-                  if (!controllerSnapshot.hasData || controllerSnapshot.data == null) {
-                    return SizedBox.expand(
-                      child: _buildVideoPlaceholder(
-                        video, 
-                        _bufferingStates[video.videoUrl] ?? true
-                      ),
-                    );
-                  }
-
-                  return SizedBox.expand(
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        mk.Video(controller: controllerSnapshot.data!),
-                        VideoCard(
-                          video: video,
-                          controller: controllerSnapshot.data!,
-                          player: _players[video.videoUrl]!,
-                          onVisibilityChanged: (isVisible) => 
-                              onVideoVisibilityChanged(video.videoUrl, isVisible),
-                          showPrivacyIndicator: widget.showPrivacyControls,
-                          onDelete: widget.allowDeletion 
-                              ? () {
-                                  VideoFeedService().deleteVideo(video.id);
-                                  widget.onVideoDeleted?.call();
-                                }
-                              : null,
-                        ),
-                        if (_bufferingStates[video.videoUrl] ?? false)
-                          Container(
-                            color: Colors.black26,
-                            child: const Center(
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            ),
+              return PageView.builder(
+                scrollDirection: Axis.vertical,
+                controller: _pageController,
+                itemCount: _videos.length,
+                itemBuilder: (context, index) {
+                  final video = _videos[index];
+                  
+                  return FutureBuilder<mk.VideoController?>(
+                    future: _getController(video.videoUrl),
+                    builder: (context, controllerSnapshot) {
+                      if (!controllerSnapshot.hasData || controllerSnapshot.data == null) {
+                        return SizedBox.expand(
+                          child: _buildVideoPlaceholder(
+                            video, 
+                            _bufferingStates[video.videoUrl] ?? true
                           ),
-                      ],
-                    ),
+                        );
+                      }
+
+                      return SizedBox.expand(
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            mk.Video(controller: controllerSnapshot.data!),
+                            VideoCard(
+                              video: video,
+                              controller: controllerSnapshot.data!,
+                              player: _players[video.videoUrl]!,
+                              onVisibilityChanged: (isVisible) => 
+                                  onVideoVisibilityChanged(video.videoUrl, isVisible),
+                              showPrivacyIndicator: widget.showPrivacyControls,
+                              onDelete: widget.allowDeletion 
+                                  ? () {
+                                      VideoFeedService().deleteVideo(video.id);
+                                      widget.onVideoDeleted?.call();
+                                    }
+                                  : null,
+                            ),
+                            if (_bufferingStates[video.videoUrl] ?? false)
+                              Container(
+                                color: Colors.black26,
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    },
                   );
                 },
               );
             },
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 } 

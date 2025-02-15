@@ -4,9 +4,11 @@ import 'package:media_kit_video/media_kit_video.dart' as mk;
 import 'package:visibility_detector/visibility_detector.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/video_feed_service.dart';
+import '../services/video_enhancements_service.dart';
 import '../../studio/models/video_edit.dart';
 import '../../studio/widgets/drawing_painter.dart';
 import 'video_chapter_list.dart';
+import 'transcript_search_box.dart';
 
 class VideoCard extends StatefulWidget {
   final Video video;
@@ -32,15 +34,19 @@ class VideoCard extends StatefulWidget {
 
 class _VideoCardState extends State<VideoCard> {
   final VideoFeedService _feedService = VideoFeedService();
+  final VideoEnhancementsService _enhancementsService = VideoEnhancementsService();
   bool _isVisible = false;
   bool _isChapterListExpanded = false;
   VideoEdit? _videoEdit;
+  VideoEnhancements? _enhancements;
   double _currentPosition = 0.0;
+  bool _showSearch = false;
 
   @override
   void initState() {
     super.initState();
     _loadVideoEdit();
+    _loadEnhancements();
     _setupPositionListener();
   }
 
@@ -83,7 +89,24 @@ class _VideoCardState extends State<VideoCard> {
   }
 
   Future<void> _loadVideoEdit() async {
+    print('\n--- Loading Video Edit ---');
+    print('Video ID: ${widget.video.id}');
+    
     _feedService.getVideoEdits(widget.video.id).listen((videoEdit) {
+      print('Received video edit: ${videoEdit != null}');
+      if (videoEdit != null) {
+        print('Video edit details:');
+        print('- Has captions: ${videoEdit.captions.isNotEmpty}');
+        print('- Number of captions: ${videoEdit.captions.length}');
+        print('- Captions enabled: ${videoEdit.isCaptionsEnabled}');
+        if (videoEdit.captions.isNotEmpty) {
+          print('\nFirst few captions:');
+          for (var caption in videoEdit.captions.take(3)) {
+            print('- "${caption.text}" (${caption.startTime}s - ${caption.startTime + caption.duration}s)');
+          }
+        }
+      }
+      
       if (mounted) {
         setState(() {
           _videoEdit = videoEdit;
@@ -94,6 +117,21 @@ class _VideoCardState extends State<VideoCard> {
         if (videoEdit?.trimStartTime != null && widget.player.state.playing) {
           widget.player.seek(Duration(milliseconds: (videoEdit!.trimStartTime! * 1000).round()));
         }
+      }
+    });
+  }
+
+  Future<void> _loadEnhancements() async {
+    print('Loading enhancements for video: ${widget.video.id}');
+    _enhancementsService.getEnhancements(widget.video.id).listen((enhancements) {
+      if (mounted) {
+        print('Received enhancements: ${enhancements != null}');
+        if (enhancements != null) {
+          print('Number of subtitles: ${enhancements.subtitles.length}');
+        }
+        setState(() {
+          _enhancements = enhancements;
+        });
       }
     });
   }
@@ -341,8 +379,19 @@ class _VideoCardState extends State<VideoCard> {
     return currentCaption.text;
   }
 
+  void _seekToTimestamp(double timestamp) {
+    widget.player.seek(Duration(milliseconds: (timestamp * 1000).round()));
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Debug prints for search functionality
+    print('\n--- Building VideoCard ---');
+    print('Video ID: ${widget.video.id}');
+    print('Has video edit: ${_videoEdit != null}');
+    print('Number of captions: ${_videoEdit?.captions.length ?? 0}');
+    print('Show search: $_showSearch');
+    
     return VisibilityDetector(
       key: Key(widget.video.id),
       onVisibilityChanged: (info) {
@@ -394,23 +443,6 @@ class _VideoCardState extends State<VideoCard> {
                             ),
                           ),
                         const SizedBox(width: 8),
-                        // Add info button
-                        if (_videoEdit?.interactiveOverlays.isNotEmpty == true)
-                          GestureDetector(
-                            onTap: _showInfoCard,
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.black45,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: const Icon(
-                                Icons.info_outline,
-                                color: Colors.blue,
-                                size: 20,
-                              ),
-                            ),
-                          ),
                         if (widget.onDelete != null) ...[
                           const SizedBox(width: 16),
                           GestureDetector(

@@ -7,7 +7,7 @@ class Subtitle {
   final double startTime;
   final double endTime;
   final String text;
-  final TextStyle style;
+  final SubtitleStyle style;
 
   Subtitle({
     required this.id,
@@ -30,18 +30,18 @@ class Subtitle {
     startTime: json['startTime'],
     endTime: json['endTime'],
     text: json['text'],
-    style: TextStyle.fromJson(json['style']),
+    style: SubtitleStyle.fromJson(json['style']),
   );
 }
 
-class TextStyle {
+class SubtitleStyle {
   final String color;
   final double size;
   final Position position;
   final String? background;
   final String fontWeight;
 
-  TextStyle({
+  SubtitleStyle({
     required this.color,
     required this.size,
     required this.position,
@@ -57,7 +57,7 @@ class TextStyle {
     'fontWeight': fontWeight,
   };
 
-  factory TextStyle.fromJson(Map<String, dynamic> json) => TextStyle(
+  factory SubtitleStyle.fromJson(Map<String, dynamic> json) => SubtitleStyle(
     color: json['color'],
     size: json['size'],
     position: Position.fromJson(json['position']),
@@ -78,14 +78,14 @@ class Position {
       Position(x: json['x'], y: json['y']);
 }
 
-class Timestamp {
+class TimestampMark {
   final String id;
   final double time;
   final String title;
   final String? description;
   final String? thumbnail;
 
-  Timestamp({
+  TimestampMark({
     required this.id,
     required this.time,
     required this.title,
@@ -101,7 +101,7 @@ class Timestamp {
     'thumbnail': thumbnail,
   };
 
-  factory Timestamp.fromJson(Map<String, dynamic> json) => Timestamp(
+  factory TimestampMark.fromJson(Map<String, dynamic> json) => TimestampMark(
     id: json['id'],
     time: json['time'],
     title: json['title'],
@@ -112,7 +112,7 @@ class Timestamp {
 
 class VideoEnhancements {
   final List<Subtitle> subtitles;
-  final List<Timestamp> timestamps;
+  final List<TimestampMark> timestamps;
   final DateTime lastModified;
   final int version;
 
@@ -126,7 +126,7 @@ class VideoEnhancements {
   Map<String, dynamic> toJson() => {
     'subtitles': subtitles.map((s) => s.toJson()).toList(),
     'timestamps': timestamps.map((t) => t.toJson()).toList(),
-    'lastModified': Timestamp.fromDate(lastModified),
+    'lastModified': FieldValue.serverTimestamp(),
     'version': version,
   };
 
@@ -135,7 +135,7 @@ class VideoEnhancements {
         .map((s) => Subtitle.fromJson(s))
         .toList(),
     timestamps: (json['timestamps'] as List)
-        .map((t) => Timestamp.fromJson(t))
+        .map((t) => TimestampMark.fromJson(t))
         .toList(),
     lastModified: (json['lastModified'] as Timestamp).toDate(),
     version: json['version'],
@@ -175,7 +175,7 @@ class VideoEnhancementsService {
   }
 
   // Add a timestamp
-  Future<void> addTimestamp(String videoId, Timestamp timestamp) async {
+  Future<void> addTimestamp(String videoId, TimestampMark timestamp) async {
     await _firestore.collection('video_enhancements').doc(videoId).update({
       'timestamps': FieldValue.arrayUnion([timestamp.toJson()]),
       'lastModified': FieldValue.serverTimestamp(),
